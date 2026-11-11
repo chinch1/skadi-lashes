@@ -31,6 +31,7 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Paso 1 hecho: proyecto Next.js, clientes de Supabase y adaptador de Cloudflare. Publicado en https://skadi-lashes.nicolaandresr.workers.dev con `npm run deploy`. `SUPABASE_SERVICE_ROLE_KEY` está cargada como secreto en Cloudflare.
 - Paso 2 hecho y publicado: inicio de sesión en `/admin/login`, `/admin` protegido y las cinco pestañas con texto provisional. No se usa `proxy.ts` (experimental en el adaptador de Cloudflare): una sesión vencida se renueva en la ruta `/admin/sesion`. Toda acción del servidor de `/admin` debe llamar a `requireAdminAction()` de `src/lib/auth.ts`.
 - Paso 3 hecho y publicado: pantalla Servicios en `/admin/servicios`. Secciones y servicios se ordenan arrastrando (dnd-kit). La foto se reduce en el navegador (lado mayor 1280 px, JPEG) y se sube por el servidor con la llave de servicio a `service-photos/<studio_id>/<service_id>/`; no hay políticas de almacenamiento. La foto es opcional al guardar (por confirmar con Giselle).
+- Paso 4 hecho, sin publicar: pantalla "Mi horario" en `/admin/ajustes/horario` (horario semanal con una pausa opcional por día, bloqueos y vista previa "Así lo ven las clientas"), cálculo de cupos en `src/lib/availability.ts` con pruebas (`npm test`) y ruta pública `GET /api/availability?month=AAAA-MM&services=<ids>`. Intervalo (30 min), descanso (0) y anticipación mínima (60 min) son constantes en `src/lib/booking-config.ts`, por confirmar. Una cita `pending_deposit` con reserva vencida no ocupa cupo en el cálculo, pero la restricción de la base de datos sí la cuenta: el paso 5 debe liberarla antes de reservar.
 
 ## Reglas del negocio
 
@@ -145,7 +146,8 @@ Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. 
 
 ## Pendiente por decidir o dibujar
 
-- Horario de trabajo de Giselle y pantalla "Mi horario" (modelo: horario semanal más bloqueos).
+- Horario real de Giselle (la pantalla "Mi horario" ya existe; falta cargarlo).
+- Horario especial por fecha: Giselle arma el calendario de un mes completo con antelación (por ejemplo, diciembre desde noviembre). El horario semanal es uno solo y los bloqueos solo quitan tiempo; falta poder dar a una fecha o rango unas horas distintas. Decidido con Nico: pulir después de ver el paso 4 funcionando.
 - Fuente de tasas: dirección definitiva, cómo recibe la llave y cada cuánto se actualiza. Una respuesta observada tenía 7 días de atraso.
 - Mensaje de confirmación al aprobar un abono (botón "Aprobar y avisar") y mensaje al rechazar.
 - Enlace privado por cita (`manage_token`) para gestionar la cita sin escribir el número.
