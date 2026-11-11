@@ -29,6 +29,7 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Los cambios posteriores ya están aplicados y verificados (11 nov 2026): `clients.deposit_exempt`, las columnas de tasas en `studios` y las de pago en `deposits`.
 - Faltan por cargar: datos de Pago Móvil y Binance, tasas de cambio, horario de trabajo, servicios reales.
 - Paso 1 hecho: proyecto Next.js, clientes de Supabase y adaptador de Cloudflare. Publicado en https://skadi-lashes.nicolaandresr.workers.dev con `npm run deploy`. `SUPABASE_SERVICE_ROLE_KEY` está cargada como secreto en Cloudflare.
+- Paso 2 hecho y publicado: inicio de sesión en `/admin/login`, `/admin` protegido y las cinco pestañas con texto provisional. No se usa `proxy.ts` (experimental en el adaptador de Cloudflare): una sesión vencida se renueva en la ruta `/admin/sesion`. Toda acción del servidor de `/admin` debe llamar a `requireAdminAction()` de `src/lib/auth.ts`.
 
 ## Reglas del negocio
 
