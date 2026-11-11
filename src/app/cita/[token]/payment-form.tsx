@@ -229,9 +229,6 @@ export function PaymentForm({
           <p className="break-words text-3xl font-semibold tabular-nums text-primary">
             {formatUsdt(binance.amountUsdt)}
           </p>
-          <p className="text-sm text-muted">
-            Equivale a {formatEuros(depositCents)}
-          </p>
           <dl className="mt-4 divide-y divide-border border-t border-border">
             <CopyRow
               label="Cuenta (correo o Pay ID)"
