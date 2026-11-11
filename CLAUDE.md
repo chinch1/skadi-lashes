@@ -33,7 +33,9 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Paso 3 hecho y publicado: pantalla Servicios en `/admin/servicios`. Secciones y servicios se ordenan arrastrando (dnd-kit). La foto se reduce en el navegador (lado mayor 1280 px, JPEG) y se sube por el servidor con la llave de servicio a `service-photos/<studio_id>/<service_id>/`; no hay políticas de almacenamiento. La foto es opcional al guardar (por confirmar con Giselle).
 - Paso 4 hecho, sin publicar: pantalla "Mi horario" en `/admin/ajustes/horario` (horario semanal con una pausa opcional por día, bloqueos y vista previa "Así lo ven las clientas"), cálculo de cupos en `src/lib/availability.ts` con pruebas (`npm test`) y ruta pública `GET /api/availability?month=AAAA-MM&services=<ids>`. Intervalo (30 min), descanso (0) y anticipación mínima (60 min) son constantes en `src/lib/booking-config.ts`, por confirmar. Una cita `pending_deposit` con reserva vencida no ocupa cupo en el cálculo, pero la restricción de la base de datos sí la cuenta: el paso 5 debe liberarla antes de reservar.
 - Paso 5 hecho, sin publicar: flujo de agendar en `/agendar` (servicios, calendario, datos) y página privada de la cita en `/cita/<manage_token>` (pago del abono, comprobante enviado, cita confirmada, avisos). La lógica está en `src/lib/booking.ts`. El horario se aparta al llegar al pago (`hold_expires_at` = ahora + `pending_hold_hours`); al subir el comprobante, `hold_expires_at` pasa a nulo y queda apartado hasta que Giselle decida. La tasa se congela en `appointments.quote_eur_to_ves` y `quote_eur_to_usdt`. Los comprobantes van al almacén privado `receipts/<studio_id>/<appointment_id>/`.
-- Paso 6 hecho, sin publicar: Agenda en `/admin` (abonos por aprobar con el comprobante, avisos por WhatsApp, citas del día con navegación, copiar enlace de reservas). Datos en `src/lib/agenda.ts`, acciones en `src/app/admin/(panel)/agenda-actions.ts`, mensajes en `src/lib/whatsapp.ts`. Decisiones tomadas (por confirmar con Giselle): al rechazar un comprobante la cita sigue apartada otras `pending_hold_hours` para que la clienta suba otro; aprobar y avisar son dos toques (tras aprobar aparece el botón de WhatsApp); al liberar un horario o marcar "No asistió", el abono aprobado pasa a `forfeited`.
+- Paso 6 hecho, sin publicar: Agenda en `/admin` (abonos por aprobar con el comprobante, avisos por WhatsApp, citas del día con navegación, copiar enlace de reservas). Datos en `src/lib/agenda.ts`, acciones en `src/app/admin/(panel)/agenda-actions.ts`, mensajes en `src/lib/whatsapp.ts`. Aprobar y avisar son dos toques: tras aprobar aparece el botón de WhatsApp.
+- Paso 7 hecho, sin publicar: `/reprogramar` (buscar la cita por número de WhatsApp) y `/cita/<token>/reprogramar` (cambio a tiempo, cambio tardío con abono nuevo, bloqueo tras un cambio, "No podré asistir"). Reglas en `src/lib/reschedule-rules.ts` y `src/lib/reschedule.ts`. En el cambio tardío se reutiliza la misma cita: pasa a `pending_deposit` con reserva nueva y el abono anterior queda `forfeited`. El límite de un cambio aplica también a la clienta de confianza. La disponibilidad al reprogramar se pide con `GET /api/availability?month=…&cita=<token>`.
+- Textos de WhatsApp editables por Giselle en `/admin/ajustes/mensajes`, guardados en `studios.confirmation_message` y `rejection_message` (nulo = texto por defecto). Marcadores: `{nombre}`, `{fecha}`, `{hora}`, `{servicios}`, `{enlace}`.
 - Tasas: cargadas desde la fuente el 11 nov 2026. Se muestran en el inicio de la clienta y en la Agenda. La tarea diaria es un disparador programado de Cloudflare (`custom-worker.ts`, `triggers` en `wrangler.jsonc`) que llama a `POST /api/tasks/rates`; solo corre una vez publicado, y al publicar hay que subir `COTIZA_VE_API_KEY` como secreto.
 - Datos de prueba en la base: horario provisional de lunes a viernes 9:00–18:00, cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`) con varias citas en distintos estados, y una reserva de prueba hecha por Nico a su nombre (19 nov 2026, con abono por aprobar; no tocarla sin preguntar). Borrar todo antes de abrir al público.
 
@@ -64,14 +66,16 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 
 - Con 12 horas o más de anticipación: el abono se conserva y el cambio es inmediato.
 - Cada cita se puede reprogramar una sola vez.
-- Con menos de 12 horas: el abono se pierde. La clienta puede elegir otra fecha pagando un abono nuevo, que Giselle aprueba (supuesto de diseño, por confirmar).
+- Con menos de 12 horas: el abono se pierde. La clienta puede elegir otra fecha pagando un abono nuevo, que Giselle aprueba.
 - El cálculo usa la hora del servidor, y se revisa al abrir la pantalla y otra vez al confirmar.
 
 ### No asistir
 
 - No hay opción de "cancelar" en la pantalla de inicio.
-- Dentro de "Reprogramar" hay un enlace "No podré asistir" que libera el horario. El abono no se devuelve.
+- Dentro de "Reprogramar" hay un enlace "No podré asistir" que libera el horario.
 - Giselle también puede liberar un horario desde su agenda.
+- Abono perdido (decidido por Nico el 11 nov 2026): la clienta pierde el abono si el horario se libera con menos de 12 horas de anticipación o si no asiste. Si se libera con 12 horas o más, el abono no se marca como perdido (`forfeited`); qué se hace con él está por definir.
+- Rechazar un comprobante libera el horario de inmediato (decidido por Nico el 11 nov 2026).
 
 ### Puntualidad
 
@@ -152,7 +156,6 @@ Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. 
 
 - Horario real de Giselle (la pantalla "Mi horario" ya existe; falta cargarlo).
 - Horario especial por fecha: Giselle arma el calendario de un mes completo con antelación (por ejemplo, diciembre desde noviembre). El horario semanal es uno solo y los bloqueos solo quitan tiempo; falta poder dar a una fecha o rango unas horas distintas. Decidido con Nico: pulir después de ver el paso 4 funcionando.
-- Textos de los mensajes de WhatsApp de confirmación y de rechazo: hay una primera redacción en `src/lib/whatsapp.ts`, por revisar con Giselle.
 - Enlace privado por cita (`manage_token`) para gestionar la cita sin escribir el número.
 - Pantalla "Cita confirmada" para la clienta sin abono.
 - Textos de "Reprogramar" para la clienta sin abono.
