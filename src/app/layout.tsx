@@ -8,6 +8,16 @@ const dmSans = DM_Sans({ variable: "--font-dm-sans", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Skadi Lashes · Citas",
   description: "Agenda tu cita en Skadi Lashes, Caracas.",
+  // App instalable: cada cara tiene su manifiesto (el de /admin está en su diseño).
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: "/icons/apple-touch-icon.png",
+  },
+  appleWebApp: { capable: true, title: "Skadi Lashes", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
