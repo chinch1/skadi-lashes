@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { logout } from "../../actions";
 
 export default function Page() {
@@ -7,6 +8,20 @@ export default function Page() {
       <p className="mt-2 text-muted">
         Aquí podrás cambiar el monto del abono y el cargo por retraso.
       </p>
+      <Link
+        href="/admin/ajustes/horario"
+        className="mt-6 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Mi horario</span>
+          <span className="block text-sm text-muted">
+            Días y horas en que atiendes, y bloqueos.
+          </span>
+        </span>
+        <span aria-hidden="true" className="text-xl text-muted">
+          ›
+        </span>
+      </Link>
       <form action={logout} className="mt-8">
         <button
           type="submit"
