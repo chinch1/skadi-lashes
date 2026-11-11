@@ -14,6 +14,7 @@ type Props = {
   initialText: string; // el texto guardado, o el de la app
   defaultText: string;
   previewLink: string; // enlace de ejemplo para la vista previa
+  previewNorms: string; // normas con los ajustes actuales, para {normas}
 };
 
 export function MessageForm({
@@ -23,6 +24,7 @@ export function MessageForm({
   initialText,
   defaultText,
   previewLink,
+  previewNorms,
 }: Props) {
   const [text, setText] = useState(initialText);
   const [dirty, setDirty] = useState(false);
@@ -68,6 +70,7 @@ export function MessageForm({
     PLACEHOLDERS.map((p) => [p.key, p.example]),
   );
   examples.enlace = previewLink;
+  examples.normas = previewNorms;
   const preview = renderTemplate(text.trim() ? text : defaultText, examples);
   const missingLink =
     (kind === "confirmation" || kind === "reminder") &&

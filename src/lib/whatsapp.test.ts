@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RULES } from "./rules";
+import { RULES, buildRules } from "./rules";
 import {
   DEFAULT_CONFIRMATION_TEMPLATE,
   DEFAULT_REJECTION_TEMPLATE,
@@ -8,6 +8,7 @@ import {
   DEFAULT_RETOUCH_TEMPLATE,
   PLACEHOLDERS,
   confirmationMessage,
+  normsText,
   rejectionMessage,
   reminderMessage,
   retouchMessage,
@@ -64,14 +65,21 @@ describe("renderTemplate", () => {
 });
 
 describe("PLACEHOLDERS", () => {
-  it("ofrece los cinco marcadores", () => {
+  it("ofrece los seis marcadores", () => {
     expect(PLACEHOLDERS.map((p) => p.key)).toEqual([
       "nombre",
       "fecha",
       "hora",
       "servicios",
       "enlace",
+      "normas",
     ]);
+  });
+
+  it("el ejemplo de {normas} son Puntualidad y Acompañantes de la app", () => {
+    expect(PLACEHOLDERS.find((p) => p.key === "normas")!.example).toBe(
+      `${rule("Puntualidad")}\n${rule("Acompañantes")}`,
+    );
   });
 });
 
@@ -90,7 +98,7 @@ describe("confirmationMessage", () => {
   it("usa el texto exacto de las normas", () => {
     const text = confirmationMessage(appointment);
     expect(text).toContain(
-      "Si llegas con más de 10 minutos de retraso, Skadi evaluará si puede atenderte, con un cargo adicional de 8 €.",
+      "Si llegas con más de 10 minutos de retraso, Skadi evaluará si puede atenderte, con un cargo adicional de 8\u00a0€.",
     );
     expect(text).toContain("No se admiten acompañantes, sin excepción.");
   });
@@ -109,8 +117,31 @@ describe("confirmationMessage", () => {
     expect(confirmationMessage(appointment, "  \n ")).toBe(expected);
   });
 
-  it("el texto por defecto lleva el enlace", () => {
+  it("el texto por defecto lleva el enlace y las normas", () => {
     expect(DEFAULT_CONFIRMATION_TEMPLATE).toContain("{enlace}");
+    expect(DEFAULT_CONFIRMATION_TEMPLATE).toContain("{normas}");
+  });
+
+  it("{normas} sigue los ajustes que recibe", () => {
+    const norms = normsText(
+      buildRules({ lateFeeCents: 1000, lateToleranceMin: 15, noticeHours: 24 }),
+    );
+    const text = confirmationMessage({ ...appointment, norms });
+    expect(text).toContain(
+      "Si llegas con más de 15 minutos de retraso, Skadi evaluará si puede atenderte, con un cargo adicional de 10\u00a0€.\nNo se admiten acompañantes, sin excepción.\n\n",
+    );
+    expect(text).not.toContain("8\u00a0€");
+  });
+
+  it("un texto de Giselle sin {normas} no lleva normas", () => {
+    const text = confirmationMessage(
+      { ...appointment, norms: "NORMAS" },
+      "{nombre}, te espero el {fecha}. {enlace}",
+    );
+    expect(text).toBe("María, te espero el jueves 12 de noviembre. https://skadi.example/cita/abc");
+    expect(confirmationMessage(appointment, "{nombre}: {enlace}")).not.toContain(
+      rule("Puntualidad"),
+    );
   });
 });
 
@@ -167,8 +198,21 @@ describe("reminderMessage", () => {
     expect(reminderMessage(appointment, " \n ")).toBe(expected);
   });
 
-  it("el texto por defecto lleva el enlace", () => {
+  it("el texto por defecto lleva el enlace y las normas", () => {
     expect(DEFAULT_REMINDER_TEMPLATE).toContain("{enlace}");
+    expect(DEFAULT_REMINDER_TEMPLATE).toContain("{normas}");
+  });
+
+  it("{normas} sigue los ajustes que recibe", () => {
+    const norms = normsText(
+      buildRules({ lateFeeCents: 550, lateToleranceMin: 5, noticeHours: 12 }),
+    );
+    const lateRule = rule("Puntualidad")
+      .replace("10 minutos", "5 minutos")
+      .replace("8\u00a0€", "5,50\u00a0€");
+    expect(reminderMessage({ ...appointment, norms })).toBe(
+      expected.replace(rule("Puntualidad"), lateRule),
+    );
   });
 });
 

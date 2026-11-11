@@ -4,10 +4,13 @@ import { smallButton } from "@/components/ui";
 import { getAgenda, type AgendaAppointment } from "@/lib/agenda";
 import { requireAdminPage } from "@/lib/auth";
 import { formatBolivars, formatLongDate } from "@/lib/format";
+import { buildRules } from "@/lib/rules";
 import { getStudioRates } from "@/lib/studio-rates";
+import { getRuleSettings } from "@/lib/studio-settings";
 import { addDays } from "@/lib/time";
 import {
   confirmationMessage,
+  normsText,
   rejectionMessage,
   waLink,
 } from "@/lib/whatsapp";
@@ -34,13 +37,14 @@ function parseDate(value: string | string[] | undefined): string | undefined {
   return addDays(value, 0) === value ? value : undefined;
 }
 
-function messageData(a: AgendaAppointment, link: string) {
+function messageData(a: AgendaAppointment, link: string, norms: string) {
   return {
     firstName: a.client.firstName,
     date: a.date,
     time: a.time,
     services: a.services.map((service) => service.name),
     link,
+    norms,
   };
 }
 
@@ -56,11 +60,14 @@ export default async function Page(props: PageProps<"/admin">) {
   const { fecha } = await props.searchParams;
   const { supabase, studioId } = await requireAdminPage();
 
-  const [agenda, rates, origin] = await Promise.all([
+  const [agenda, rates, origin, ruleSettings] = await Promise.all([
     getAgenda(supabase, studioId, parseDate(fecha)),
     getStudioRates(),
     siteOrigin(),
+    getRuleSettings(),
   ]);
+  // Normas con el cargo y los minutos de Ajustes, para {normas}.
+  const norms = normsText(buildRules(ruleSettings));
   // Hora del servidor: decide si ya se puede marcar "Asistió" o "No asistió",
   // y si liberar ahora hace perder el abono.
   const now = serverNow();
@@ -116,7 +123,7 @@ export default async function Page(props: PageProps<"/admin">) {
                 href={waLink(
                   a.client.phone,
                   confirmationMessage(
-                    messageData(a, `${origin}/cita/${a.token}`),
+                    messageData(a, `${origin}/cita/${a.token}`, norms),
                     templates.confirmation,
                   ),
                 )}
@@ -131,7 +138,7 @@ export default async function Page(props: PageProps<"/admin">) {
                   a.client.phone,
                   // El horario ya quedó libre: se envía el enlace para agendar.
                   rejectionMessage(
-                    messageData(a, `${origin}/agendar`),
+                    messageData(a, `${origin}/agendar`, norms),
                     templates.rejection,
                   ),
                 )}
