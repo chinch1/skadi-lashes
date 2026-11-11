@@ -56,6 +56,10 @@ create table studios (
   rates_source_updated_at  timestamptz,                    -- fecha que reporta la fuente de la tasa
   rates_fetched_at         timestamptz,                    -- última consulta nuestra
 
+  -- Textos de WhatsApp que la dueña puede cambiar (null = texto por defecto de la app)
+  confirmation_message     text,
+  rejection_message        text,
+
   created_at               timestamptz not null default now()
 );
 
