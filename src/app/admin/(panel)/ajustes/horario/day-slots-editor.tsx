@@ -242,6 +242,21 @@ export function DaySlotsEditor({
             type="button"
             className={helperButton}
             disabled={openDates.length === 0}
+            onClick={() =>
+              changeSelection(
+                openDates.filter((d) => {
+                  const weekday = weekdayOf(d);
+                  return weekday === 0 || weekday === 6;
+                }),
+              )
+            }
+          >
+            Fines de semana
+          </button>
+          <button
+            type="button"
+            className={helperButton}
+            disabled={openDates.length === 0}
             onClick={() => changeSelection(openDates)}
           >
             Todo el mes
