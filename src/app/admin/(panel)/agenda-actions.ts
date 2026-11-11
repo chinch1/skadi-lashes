@@ -99,19 +99,10 @@ export async function rejectDeposit(depositId: string): Promise<Result> {
   try {
     if (!isUuid(depositId)) return { error: "Abono no válido." };
 
-    const { data: studio, error: studioError } = await supabase
-      .from("studios")
-      .select("pending_hold_hours")
-      .eq("id", studioId)
-      .maybeSingle();
-    if (studioError || !studio) {
-      return failure("rechazar: estudio", studioError?.message ?? "No se encontró.");
-    }
-
-    const now = new Date();
+    const now = new Date().toISOString();
     const { data: rejected, error } = await supabase
       .from("deposits")
-      .update({ status: "rejected", reviewed_at: now.toISOString() })
+      .update({ status: "rejected", reviewed_at: now })
       .eq("id", depositId)
       .eq("studio_id", studioId)
       .eq("status", "pending")
@@ -119,18 +110,23 @@ export async function rejectDeposit(depositId: string): Promise<Result> {
     if (error) return failure("rechazar", error.message);
     if (!rejected || rejected.length === 0) return { error: ALREADY_REVIEWED };
 
-    // La clienta puede subir otro comprobante en su enlace privado. Si no lo
-    // hace a tiempo, el horario se libera solo.
-    const hours = Number(studio.pending_hold_hours) || 2;
-    const { error: holdError } = await supabase
+    // El horario se libera de inmediato. Si la clienta quiere, agenda de nuevo.
+    const { error: releaseError } = await supabase
       .from("appointments")
-      .update({
-        hold_expires_at: new Date(now.getTime() + hours * 3_600_000).toISOString(),
-      })
+      .update({ status: "released", hold_expires_at: null })
       .eq("id", rejected[0].appointment_id)
       .eq("studio_id", studioId)
       .eq("status", "pending_deposit");
-    if (holdError) return failure("rechazar: nueva reserva", holdError.message);
+    if (releaseError) {
+      // Se deshace el rechazo para no dejar un horario ocupado sin abono por revisar.
+      await supabase
+        .from("deposits")
+        .update({ status: "pending", reviewed_at: null })
+        .eq("id", depositId)
+        .eq("studio_id", studioId)
+        .eq("status", "rejected");
+      return failure("rechazar: liberar cita", releaseError.message);
+    }
     return OK;
   } catch (e) {
     return failure("rechazar: inesperado", e);
@@ -148,34 +144,50 @@ export async function releaseAppointment(appointmentId: string): Promise<Result>
   try {
     if (!isUuid(appointmentId)) return { error: NOT_FOUND };
 
+    const { data: studio, error: studioError } = await supabase
+      .from("studios")
+      .select("reschedule_notice_hours")
+      .eq("id", studioId)
+      .maybeSingle();
+    if (studioError || !studio) {
+      return failure("liberar: estudio", studioError?.message ?? "No se encontró.");
+    }
+
     const { data: released, error } = await supabase
       .from("appointments")
       .update({ status: "released" })
       .eq("id", appointmentId)
       .eq("studio_id", studioId)
       .in("status", ["pending_deposit", "confirmed"])
-      .select("id");
+      .select("id, starts_at");
     if (error) return failure("liberar", error.message);
     if (!released || released.length === 0) return { error: NOT_ACTIVE };
 
-    // Abonos sin revisar: rechazados. Abonos aprobados: perdidos (no se devuelven).
-    const now = new Date().toISOString();
-    const [pendingRes, approvedRes] = await Promise.all([
-      supabase
-        .from("deposits")
-        .update({ status: "rejected", reviewed_at: now })
-        .eq("appointment_id", appointmentId)
-        .eq("studio_id", studioId)
-        .eq("status", "pending"),
-      supabase
+    // Con menos horas de aviso que las del estudio (o ya empezada), el abono
+    // aprobado se pierde. Con tiempo, queda aprobado.
+    const now = new Date();
+    const noticeHours = Number(studio.reschedule_notice_hours ?? 12) || 0;
+    const startsAt = new Date(released[0].starts_at).getTime();
+    const late = startsAt - now.getTime() < noticeHours * 3_600_000;
+
+    // Abonos sin revisar: rechazados.
+    const { error: pendingError } = await supabase
+      .from("deposits")
+      .update({ status: "rejected", reviewed_at: now.toISOString() })
+      .eq("appointment_id", appointmentId)
+      .eq("studio_id", studioId)
+      .eq("status", "pending");
+    if (pendingError) return failure("liberar: abonos pendientes", pendingError.message);
+
+    if (late) {
+      const { error: approvedError } = await supabase
         .from("deposits")
         .update({ status: "forfeited" })
         .eq("appointment_id", appointmentId)
         .eq("studio_id", studioId)
-        .eq("status", "approved"),
-    ]);
-    if (pendingRes.error) return failure("liberar: abonos pendientes", pendingRes.error.message);
-    if (approvedRes.error) return failure("liberar: abonos aprobados", approvedRes.error.message);
+        .eq("status", "approved");
+      if (approvedError) return failure("liberar: abonos aprobados", approvedError.message);
+    }
     return OK;
   } catch (e) {
     return failure("liberar: inesperado", e);

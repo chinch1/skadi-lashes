@@ -11,11 +11,18 @@ import { ActionError, useAgendaAction } from "./use-agenda-action";
 type Props = {
   appointmentId: string;
   canRelease: boolean;
+  // Pregunta antes de liberar, ya ajustada a esta cita.
+  releaseConfirm: string;
   // Solo cuando la cita confirmada ya empezó (hora del servidor).
   canMark: boolean;
 };
 
-export function AppointmentActions({ appointmentId, canRelease, canMark }: Props) {
+export function AppointmentActions({
+  appointmentId,
+  canRelease,
+  releaseConfirm,
+  canMark,
+}: Props) {
   const { pending, running, error, run } = useAgendaAction();
   if (!canRelease && !canMark) return null;
 
@@ -55,7 +62,7 @@ export function AppointmentActions({ appointmentId, canRelease, canMark }: Props
             run(
               "release",
               () => releaseAppointment(appointmentId),
-              "¿Liberar este horario? El abono no se devuelve.",
+              releaseConfirm,
             )
           }
           className={`${smallButton} self-start -ml-3 text-red-800`}

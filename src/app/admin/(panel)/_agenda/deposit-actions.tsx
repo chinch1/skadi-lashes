@@ -25,7 +25,7 @@ export function DepositActions({ depositId }: { depositId: string }) {
             run(
               "reject",
               () => rejectDeposit(depositId),
-              "¿Rechazar este comprobante? La clienta podrá subir otro.",
+              "¿Rechazar este comprobante? El horario se libera de inmediato.",
             )
           }
           className={`${secondaryButton} bg-white`}
