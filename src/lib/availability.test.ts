@@ -1,208 +1,199 @@
 import { describe, expect, it } from "vitest";
 
-import { computeAvailability, type AvailabilityInput } from "./availability";
+import { computeAvailability, type AvailabilityInput, type DaySlot } from "./availability";
 
 // Caracas: UTC−4 todo el año. 09:00 local = 13:00Z.
-// 2026-11-16 es lunes (weekday 1).
-const LUNES = "2026-11-16";
+const DIA = "2026-11-16";
+
+function slots(day: string, ...times: string[]): DaySlot[] {
+  return times.map((start_time) => ({ day, start_time }));
+}
 
 function base(overrides: Partial<AvailabilityInput> = {}): AvailabilityInput {
   return {
     timeZone: "America/Caracas",
-    workingHours: [{ weekday: 1, opens_at: "09:00:00", closes_at: "12:00:00" }],
-    blocks: [],
+    slots: slots(DIA, "09:00", "11:00", "14:00"),
     appointments: [],
     durationMin: 60,
-    slotIntervalMin: 30,
     bufferMin: 0,
     minNoticeMin: 0,
     now: new Date("2026-11-01T00:00:00Z"),
-    from: LUNES,
-    to: LUNES,
+    from: DIA,
+    to: DIA,
     lastBookableDate: "2026-12-31",
     ...overrides,
   };
 }
 
+// Cita en hora local de Caracas (UTC−4), como instantes ISO.
+function cita(day: string, start: string, end: string) {
+  return {
+    starts_at: new Date(`${day}T${start}:00-04:00`).toISOString(),
+    ends_at: new Date(`${day}T${end}:00-04:00`).toISOString(),
+  };
+}
+
 describe("computeAvailability", () => {
-  it("genera las horas de un día normal", () => {
-    expect(computeAvailability(base())).toEqual({
-      [LUNES]: ["09:00", "09:30", "10:00", "10:30", "11:00"],
+  it("ofrece exactamente las horas marcadas de un día", () => {
+    expect(computeAvailability(base())).toEqual({ [DIA]: ["09:00", "11:00", "14:00"] });
+  });
+
+  it("deja vacías las fechas sin horas marcadas, pero las incluye", () => {
+    const result = computeAvailability(base({ from: "2026-11-15", to: "2026-11-17" }));
+    expect(result).toEqual({
+      "2026-11-15": [],
+      [DIA]: ["09:00", "11:00", "14:00"],
+      "2026-11-17": [],
     });
   });
 
-  it("solo ofrece las horas donde cabe la duración completa", () => {
-    const result = computeAvailability(base({ durationMin: 150 }));
-    expect(result[LUNES]).toEqual(["09:00", "09:30"]);
+  it("quita las horas repetidas y las ordena", () => {
+    const result = computeAvailability(
+      base({ slots: slots(DIA, "14:00", "09:00", "11:00", "09:00", "09:00:00") }),
+    );
+    expect(result[DIA]).toEqual(["09:00", "11:00", "14:00"]);
   });
 
-  it("no cruza la pausa y alinea el segundo rango con su propia apertura", () => {
+  it("acepta horas con segundos", () => {
+    const result = computeAvailability(base({ slots: slots(DIA, "09:30:00", "16:45:00") }));
+    expect(result[DIA]).toEqual(["09:30", "16:45"]);
+  });
+
+  it("no tiene hora de cierre: una cita puede terminar tarde", () => {
     const result = computeAvailability(
-      base({
-        workingHours: [
-          { weekday: 1, opens_at: "09:00", closes_at: "12:00" },
-          { weekday: 1, opens_at: "13:15", closes_at: "16:00" },
-        ],
-        durationMin: 90,
-      }),
+      base({ slots: slots(DIA, "20:00"), durationMin: 180 }),
     );
-    expect(result[LUNES]).toEqual([
+    expect(result[DIA]).toEqual(["20:00"]);
+  });
+
+  it("no ofrece horas que se cruzan con una cita", () => {
+    const result = computeAvailability(
+      base({ appointments: [cita(DIA, "10:30", "11:30")] }),
+    );
+    // 09:00–10:00 libre; 11:00–12:00 se cruza; 14:00 libre.
+    expect(result[DIA]).toEqual(["09:00", "14:00"]);
+  });
+
+  it("permite tocar una cita sin descanso, pero no con descanso de 15 minutos", () => {
+    const appointments = [cita(DIA, "10:00", "11:00")];
+    // 09:00–10:00 termina justo cuando empieza la cita; 11:00 empieza justo cuando termina.
+    expect(computeAvailability(base({ appointments, bufferMin: 0 }))[DIA]).toEqual([
       "09:00",
-      "09:30",
-      "10:00",
-      "10:30",
-      "13:15",
-      "13:45",
-      "14:15",
+      "11:00",
+      "14:00",
+    ]);
+    expect(computeAvailability(base({ appointments, bufferMin: 15 }))[DIA]).toEqual([
+      "14:00",
     ]);
   });
 
-  it("no repite horas cuando los rangos se solapan", () => {
+  it("antes de reservar, una hora ofrecida no bloquea a otra", () => {
+    const result = computeAvailability(
+      base({ slots: slots(DIA, "09:00", "11:00"), durationMin: 180 }),
+    );
+    expect(result[DIA]).toEqual(["09:00", "11:00"]);
+  });
+
+  it("una cita larga consume las horas siguientes que se cruzan", () => {
     const result = computeAvailability(
       base({
-        workingHours: [
-          { weekday: 1, opens_at: "09:00", closes_at: "11:00" },
-          { weekday: 1, opens_at: "09:00", closes_at: "11:00" },
-          { weekday: 1, opens_at: "10:00", closes_at: "12:00" },
-        ],
+        slots: slots(DIA, "09:00", "11:00"),
+        durationMin: 180,
+        appointments: [cita(DIA, "09:00", "12:00")],
       }),
     );
-    expect(result[LUNES]).toEqual(["09:00", "09:30", "10:00", "10:30", "11:00"]);
-  });
+    expect(result[DIA]).toEqual([]);
 
-  it("un bloqueo quita las horas que se cruzan con él", () => {
-    const result = computeAvailability(
+    // También para un servicio corto: 11:00 cae dentro de la cita de 09:00 a 12:00.
+    const corto = computeAvailability(
       base({
-        // 10:00–10:30 local
-        blocks: [{ starts_at: "2026-11-16T14:00:00Z", ends_at: "2026-11-16T14:30:00Z" }],
+        slots: slots(DIA, "09:00", "11:00", "12:00"),
+        durationMin: 60,
+        appointments: [cita(DIA, "09:00", "12:00")],
       }),
     );
-    expect(result[LUNES]).toEqual(["09:00", "10:30", "11:00"]);
+    expect(corto[DIA]).toEqual(["12:00"]);
   });
 
-  it("una cita existente quita las horas que se cruzan con ella", () => {
+  it("respeta el aviso mínimo el mismo día", () => {
+    // Ahora: 10:15 local (14:15Z). Aviso mínimo: 60 minutos -> desde las 11:15.
     const result = computeAvailability(
       base({
-        // 10:00–11:00 local
-        appointments: [{ starts_at: "2026-11-16T14:00:00Z", ends_at: "2026-11-16T15:00:00Z" }],
-      }),
-    );
-    expect(result[LUNES]).toEqual(["09:00", "11:00"]);
-  });
-
-  it("permite tocar una cita sin descanso y lo rechaza con 15 minutos de descanso", () => {
-    // Cita 10:00–11:00 local.
-    const appointments = [
-      { starts_at: "2026-11-16T14:00:00Z", ends_at: "2026-11-16T15:00:00Z" },
-    ];
-    const sinDescanso = computeAvailability(base({ appointments, bufferMin: 0 }));
-    expect(sinDescanso[LUNES]).toEqual(["09:00", "11:00"]);
-
-    const conDescanso = computeAvailability(base({ appointments, bufferMin: 15 }));
-    expect(conDescanso[LUNES]).toEqual([]);
-  });
-
-  it("el descanso no aplica a los bloqueos", () => {
-    const result = computeAvailability(
-      base({
-        blocks: [{ starts_at: "2026-11-16T14:00:00Z", ends_at: "2026-11-16T15:00:00Z" }],
-        bufferMin: 15,
-      }),
-    );
-    expect(result[LUNES]).toEqual(["09:00", "11:00"]);
-  });
-
-  it("respeta la anticipación mínima en el día de hoy", () => {
-    const result = computeAvailability(
-      base({
-        // Ahora: 09:10 local; con 60 min de aviso, la primera hora es 10:10 → 10:30.
-        now: new Date("2026-11-16T13:10:00Z"),
+        slots: slots(DIA, "09:00", "11:00", "11:15", "14:00"),
+        now: new Date("2026-11-16T14:15:00Z"),
         minNoticeMin: 60,
       }),
     );
-    expect(result[LUNES]).toEqual(["10:30", "11:00"]);
+    expect(result[DIA]).toEqual(["11:15", "14:00"]);
   });
 
-  it("acepta una hora que empieza justo en now + anticipación", () => {
-    const result = computeAvailability(
-      base({ now: new Date("2026-11-16T13:00:00Z"), minNoticeMin: 60 }),
-    );
-    expect(result[LUNES]).toEqual(["10:00", "10:30", "11:00"]);
-  });
-
-  it("un día sin horario de trabajo queda vacío", () => {
-    // 2026-11-15 es domingo.
-    const result = computeAvailability(base({ from: "2026-11-15", to: "2026-11-15" }));
-    expect(result).toEqual({ "2026-11-15": [] });
-  });
-
-  it("las fechas después de lastBookableDate quedan vacías", () => {
+  it("no ofrece horas después de la última fecha reservable", () => {
     const result = computeAvailability(
       base({
-        workingHours: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
-          weekday,
-          opens_at: "09:00",
-          closes_at: "10:00",
-        })),
-        from: "2026-11-16",
-        to: "2026-11-18",
-        lastBookableDate: "2026-11-17",
+        slots: [...slots(DIA, "09:00"), ...slots("2026-11-17", "09:00")],
+        to: "2026-11-17",
+        lastBookableDate: DIA,
       }),
     );
-    expect(result).toEqual({
-      "2026-11-16": ["09:00"],
-      "2026-11-17": ["09:00"],
-      "2026-11-18": [],
-    });
+    expect(result).toEqual({ [DIA]: ["09:00"], "2026-11-17": [] });
   });
 
-  it("recorre varias fechas y cruza el cambio de mes", () => {
+  it("recorre un rango que cruza de un mes a otro", () => {
     const result = computeAvailability(
       base({
-        workingHours: [
-          { weekday: 1, opens_at: "09:00", closes_at: "10:00" }, // lunes
-          { weekday: 2, opens_at: "14:00", closes_at: "15:30" }, // martes
-        ],
-        from: "2026-11-29", // domingo
-        to: "2026-12-01", // martes
+        slots: [...slots("2026-11-30", "10:00"), ...slots("2026-12-01", "15:00")],
+        from: "2026-11-29",
+        to: "2026-12-02",
       }),
     );
-    expect(Object.keys(result)).toEqual(["2026-11-29", "2026-11-30", "2026-12-01"]);
     expect(result).toEqual({
       "2026-11-29": [],
-      "2026-11-30": ["09:00"],
-      "2026-12-01": ["14:00", "14:30"],
+      "2026-11-30": ["10:00"],
+      "2026-12-01": ["15:00"],
+      "2026-12-02": [],
     });
   });
 
-  it("ubica en el día local un bloqueo que cae en el día universal siguiente", () => {
-    // Local lunes 20:00–22:00 = martes 00:00–02:00Z.
-    const workingHours = [
-      { weekday: 1, opens_at: "19:00", closes_at: "23:00" },
-      { weekday: 2, opens_at: "19:00", closes_at: "23:00" },
-    ];
-    const blocks = [{ starts_at: "2026-11-17T00:00:00Z", ends_at: "2026-11-17T02:00:00Z" }];
+  it("usa la zona del estudio: una cita guardada el día universal siguiente bloquea la hora local correcta", () => {
+    // 21:00 del 16 en Caracas = 01:00Z del 17.
     const result = computeAvailability(
-      base({ workingHours, blocks, from: "2026-11-16", to: "2026-11-17" }),
+      base({
+        slots: [...slots(DIA, "21:00"), ...slots("2026-11-17", "01:00", "21:00")],
+        appointments: [
+          { starts_at: "2026-11-17T01:00:00Z", ends_at: "2026-11-17T02:00:00Z" },
+        ],
+        to: "2026-11-17",
+      }),
     );
-    expect(result["2026-11-16"]).toEqual(["19:00", "22:00"]);
-    expect(result["2026-11-17"]).toEqual(["19:00", "19:30", "20:00", "20:30", "21:00", "21:30", "22:00"]);
+    expect(result).toEqual({ [DIA]: [], "2026-11-17": ["01:00", "21:00"] });
   });
 
-  it("ubica en el día local una cita que cae en el día universal siguiente", () => {
-    const workingHours = [{ weekday: 1, opens_at: "19:00", closes_at: "23:00" }];
-    const appointments = [
-      { starts_at: "2026-11-17T00:00:00Z", ends_at: "2026-11-17T02:00:00Z" },
-    ];
-    const result = computeAvailability(base({ workingHours, appointments }));
-    expect(result[LUNES]).toEqual(["19:00", "22:00"]);
+  it("con una duración no válida no ofrece nada", () => {
+    for (const durationMin of [0, -30, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(computeAvailability(base({ durationMin }))).toEqual({ [DIA]: [] });
+    }
   });
 
-  it("con duración o intervalo inválidos todas las fechas quedan vacías", () => {
-    const rango = { from: "2026-11-16", to: "2026-11-17" };
-    const vacio = { "2026-11-16": [], "2026-11-17": [] };
-    expect(computeAvailability(base({ ...rango, durationMin: 0 }))).toEqual(vacio);
-    expect(computeAvailability(base({ ...rango, durationMin: -30 }))).toEqual(vacio);
-    expect(computeAvailability(base({ ...rango, slotIntervalMin: 0 }))).toEqual(vacio);
+  it("ignora las horas mal formadas", () => {
+    const result = computeAvailability(
+      base({
+        slots: [
+          { day: DIA, start_time: "10:00" },
+          { day: DIA, start_time: "25:00" },
+          { day: DIA, start_time: "9:00" },
+          { day: DIA, start_time: "abc" },
+          { day: "2026-13-01", start_time: "10:00" },
+          { day: "16/11/2026", start_time: "11:00" },
+          { day: DIA, start_time: null as unknown as string },
+          null as unknown as DaySlot,
+        ],
+      }),
+    );
+    expect(result[DIA]).toEqual(["10:00"]);
+  });
+
+  it("tiene un tope de días por seguridad", () => {
+    const result = computeAvailability(base({ from: "2026-01-01", to: "2030-12-31" }));
+    expect(Object.keys(result)).toHaveLength(400);
   });
 });

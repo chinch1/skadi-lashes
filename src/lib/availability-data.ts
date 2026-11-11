@@ -1,10 +1,6 @@
 import "server-only";
 import { computeAvailability, type TimeRange } from "@/lib/availability";
-import {
-  BUFFER_MIN,
-  MIN_NOTICE_MIN,
-  SLOT_INTERVAL_MIN,
-} from "@/lib/booking-config";
+import { BUFFER_MIN, MIN_NOTICE_MIN } from "@/lib/booking-config";
 import { STUDIO_SLUG } from "@/lib/studio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays, monthDates, zonedParts, zonedToUtc } from "@/lib/time";
@@ -122,7 +118,7 @@ export async function getAppointmentMonthAvailability(
   });
 }
 
-// Parte común: estudio, ventana de reservas, horario, bloqueos y citas.
+// Parte común: estudio, ventana de reservas, horas marcadas del mes y citas.
 // `resolveSubject` corre en paralelo con las demás consultas.
 async function monthAvailability(
   month: string,
@@ -170,18 +166,15 @@ async function monthAvailability(
       };
     }
 
-    const [subject, hoursRes, blocksRes, appointmentsRes] = await Promise.all([
+    const [subject, slotsRes, appointmentsRes] = await Promise.all([
       subjectPromise,
+      // Horas de inicio que Skadi marcó a mano para los días de este mes.
       supabase
-        .from("working_hours")
-        .select("weekday, opens_at, closes_at")
-        .eq("studio_id", studioId),
-      supabase
-        .from("time_blocks")
-        .select("starts_at, ends_at")
+        .from("day_slots")
+        .select("day, start_time")
         .eq("studio_id", studioId)
-        .gt("ends_at", rangeStartUtc)
-        .lt("starts_at", rangeEndUtc),
+        .gte("day", firstDate)
+        .lte("day", lastDate),
       supabase
         .from("appointments")
         .select("id, starts_at, ends_at, status, hold_expires_at")
@@ -192,8 +185,7 @@ async function monthAvailability(
     ]);
 
     if (!subject.ok) return subject.result;
-    if (hoursRes.error) return fail("horario", hoursRes.error.message);
-    if (blocksRes.error) return fail("bloqueos", blocksRes.error.message);
+    if (slotsRes.error) return fail("horas", slotsRes.error.message);
     if (appointmentsRes.error) return fail("citas", appointmentsRes.error.message);
 
     const { durationMin } = subject;
@@ -213,11 +205,9 @@ async function monthAvailability(
 
     const days = computeAvailability({
       timeZone,
-      workingHours: hoursRes.data ?? [],
-      blocks: blocksRes.data ?? [],
+      slots: slotsRes.data ?? [],
       appointments,
       durationMin,
-      slotIntervalMin: SLOT_INTERVAL_MIN,
       bufferMin: BUFFER_MIN,
       minNoticeMin: MIN_NOTICE_MIN,
       now,
