@@ -14,7 +14,7 @@
       "service": "skadi-lashes"
     }
   ],
-  // Tarea diaria de tasas: 6:00 am y 6:00 pm, hora de Caracas (la segunda es un reintento).
+  // Tareas diarias (tasas y limpieza): 6:00 am y 6:00 pm, hora de Caracas (la segunda es un reintento).
   "triggers": { "crons": ["0 10 * * *", "0 22 * * *"] },
   "observability": { "enabled": true }
 }
