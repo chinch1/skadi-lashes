@@ -59,6 +59,8 @@ create table studios (
   -- Textos de WhatsApp que la dueña puede cambiar (null = texto por defecto de la app)
   confirmation_message     text,
   rejection_message        text,
+  reminder_message         text,  -- recordatorio de la cita de mañana
+  retouch_message          text,  -- recordatorio de retoque
 
   created_at               timestamptz not null default now()
 );
