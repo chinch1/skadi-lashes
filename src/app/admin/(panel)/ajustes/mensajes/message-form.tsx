@@ -3,12 +3,12 @@
 import { useActionState, useLayoutEffect, useRef, useState } from "react";
 import { inputClass, primaryButton, smallButton } from "@/components/ui";
 import { MESSAGE_MAX_LENGTH, PLACEHOLDERS, renderTemplate } from "@/lib/whatsapp";
-import { saveMessageTemplate, type MessageState } from "./actions";
+import { saveMessageTemplate, type MessageKind, type MessageState } from "./actions";
 
 const initialState: MessageState = { error: null, saved: false };
 
 type Props = {
-  kind: "confirmation" | "rejection";
+  kind: MessageKind;
   title: string;
   description: string;
   initialText: string; // el texto guardado, o el de la app
@@ -70,7 +70,9 @@ export function MessageForm({
   examples.enlace = previewLink;
   const preview = renderTemplate(text.trim() ? text : defaultText, examples);
   const missingLink =
-    kind === "confirmation" && text.trim() !== "" && !text.includes("{enlace}");
+    (kind === "confirmation" || kind === "reminder") &&
+    text.trim() !== "" &&
+    !text.includes("{enlace}");
   const fieldId = `mensaje-${kind}`;
 
   return (

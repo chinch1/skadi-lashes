@@ -5,6 +5,8 @@ import { requireAdminPage } from "@/lib/auth";
 import {
   DEFAULT_CONFIRMATION_TEMPLATE,
   DEFAULT_REJECTION_TEMPLATE,
+  DEFAULT_REMINDER_TEMPLATE,
+  DEFAULT_RETOUCH_TEMPLATE,
 } from "@/lib/whatsapp";
 import { MessageForm } from "./message-form";
 
@@ -25,7 +27,7 @@ export default async function Page() {
   const [{ data: studio, error }, origin] = await Promise.all([
     supabase
       .from("studios")
-      .select("confirmation_message, rejection_message")
+      .select("confirmation_message, rejection_message, reminder_message, retouch_message")
       .eq("id", studioId)
       .maybeSingle(),
     siteOrigin(),
@@ -39,7 +41,7 @@ export default async function Page() {
       </Link>
       <h1 className="mt-1 text-2xl font-semibold">Mensajes de WhatsApp</h1>
       <p className="mt-2 text-muted">
-        Desde la Agenda, el mensaje se abre ya escrito en WhatsApp. Ahí todavía
+        Desde la Agenda y Recordatorios, el mensaje se abre ya escrito en WhatsApp. Ahí todavía
         puedes cambiarlo antes de enviarlo.
       </p>
 
@@ -63,6 +65,22 @@ export default async function Page() {
             description="El horario ya quedó libre. El enlace lleva a la página para agendar."
             initialText={studio.rejection_message || DEFAULT_REJECTION_TEMPLATE}
             defaultText={DEFAULT_REJECTION_TEMPLATE}
+            previewLink={`${origin}/agendar`}
+          />
+          <MessageForm
+            kind="reminder"
+            title="Recordatorio de la cita de mañana"
+            description="Se envía el día antes. El enlace lleva a la página de su cita."
+            initialText={studio.reminder_message || DEFAULT_REMINDER_TEMPLATE}
+            defaultText={DEFAULT_REMINDER_TEMPLATE}
+            previewLink={`${origin}/cita/abc123`}
+          />
+          <MessageForm
+            kind="retouch"
+            title="Recordatorio de retoque"
+            description="Fecha, hora y servicios son los de la cita a la que vino. El enlace lleva a la página para agendar."
+            initialText={studio.retouch_message || DEFAULT_RETOUCH_TEMPLATE}
+            defaultText={DEFAULT_RETOUCH_TEMPLATE}
             previewLink={`${origin}/agendar`}
           />
         </div>
