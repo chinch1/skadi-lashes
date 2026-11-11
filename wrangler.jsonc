@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  "main": "./custom-worker.ts",
   "name": "skadi-lashes",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -14,5 +14,7 @@
       "service": "skadi-lashes"
     }
   ],
+  // Tarea diaria de tasas: 6:00 am y 6:00 pm, hora de Caracas (la segunda es un reintento).
+  "triggers": { "crons": ["0 10 * * *", "0 22 * * *"] },
   "observability": { "enabled": true }
 }
