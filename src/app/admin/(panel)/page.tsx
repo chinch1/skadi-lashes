@@ -210,9 +210,6 @@ export default async function Page(props: PageProps<"/admin">) {
             <p className="mt-1 text-lg font-semibold">
               1 € = {formatBolivars(rates.eurToVes)}
             </p>
-            <p className="text-muted">
-              En USDT se cobra el mismo monto, sin conversión.
-            </p>
             {rates.updatedOn && (
               <p className="mt-1 text-sm text-muted">
                 Actualizada el {formatLongDate(rates.updatedOn)}. Se renueva
