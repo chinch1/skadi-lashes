@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { STUDIO_SLUG } from "./studio";
@@ -23,13 +24,16 @@ export async function findAdmin(supabase: SupabaseClient): Promise<Admin | null>
   return { userId: auth.user.id, studioId: data.studio_id };
 }
 
-// Para páginas y diseños de /admin.
-export async function requireAdminPage(): Promise<Admin> {
-  const { supabase, refreshBlocked } = await createReadOnlyClient();
-  const admin = await findAdmin(supabase);
-  if (admin) return admin;
-  redirect(refreshBlocked() ? "/admin/sesion" : "/admin/login");
-}
+// Para páginas y diseños de /admin. Con `cache`, el diseño y la página
+// comparten una sola comprobación por petición.
+export const requireAdminPage = cache(
+  async (): Promise<Admin & { supabase: SupabaseClient }> => {
+    const { supabase, refreshBlocked } = await createReadOnlyClient();
+    const admin = await findAdmin(supabase);
+    if (!admin) redirect(refreshBlocked() ? "/admin/sesion" : "/admin/login");
+    return { ...admin, supabase };
+  },
+);
 
 // Para acciones del servidor de /admin. Cada acción debe llamarla:
 // el diseño protegido no cubre las acciones.
