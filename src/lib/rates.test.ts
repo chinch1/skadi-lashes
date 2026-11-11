@@ -11,10 +11,10 @@ const body = (overrides: Record<string, object> = {}) => ({
 });
 
 describe("parseRates", () => {
-  it("calcula euro a bolívares y euro a USDT", () => {
+  it("lee el euro a bolívares", () => {
     expect(parseRates(body(), now)).toEqual({
       ok: true,
-      rates: { eurToVes: 1008, eurToUsdt: 1.12, sourceUpdatedAt: "2026-11-11T04:00:00.000Z" },
+      rates: { eurToVes: 1008, sourceUpdatedAt: "2026-11-11T04:00:00.000Z" },
     });
   });
 
@@ -30,13 +30,13 @@ describe("parseRates", () => {
 
   it("rechaza tasas inválidas o no disponibles", () => {
     expect(parseRates(body({ "ve-euro": { mid: 0 } }), now).ok).toBe(false);
-    expect(parseRates(body({ "ve-bcv": { mid: "900" } }), now).ok).toBe(false);
-    expect(parseRates(body({ "ve-bcv": { available: false } }), now).ok).toBe(false);
+    expect(parseRates(body({ "ve-euro": { mid: "1008" } }), now).ok).toBe(false);
+    expect(parseRates(body({ "ve-euro": { available: false } }), now).ok).toBe(false);
     expect(parseRates({}, now).ok).toBe(false);
     expect(parseRates(null, now).ok).toBe(false);
   });
 
-  it("rechaza una relación euro/dólar absurda", () => {
-    expect(parseRates(body({ "ve-bcv": { mid: 9 } }), now).ok).toBe(false);
+  it("no depende del dólar", () => {
+    expect(parseRates(body({ "ve-bcv": { available: false } }), now).ok).toBe(true);
   });
 });

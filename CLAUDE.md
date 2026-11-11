@@ -34,7 +34,7 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Paso 4 hecho, sin publicar: pantalla "Mi horario" en `/admin/ajustes/horario` (horario semanal con una pausa opcional por día, bloqueos y vista previa "Así lo ven las clientas"), cálculo de cupos en `src/lib/availability.ts` con pruebas (`npm test`) y ruta pública `GET /api/availability?month=AAAA-MM&services=<ids>`. Intervalo (30 min), descanso (0) y anticipación mínima (60 min) son constantes en `src/lib/booking-config.ts`, por confirmar. Una cita `pending_deposit` con reserva vencida no ocupa cupo en el cálculo, pero la restricción de la base de datos sí la cuenta: el paso 5 debe liberarla antes de reservar.
 - Paso 5 hecho, sin publicar: flujo de agendar en `/agendar` (servicios, calendario, datos) y página privada de la cita en `/cita/<manage_token>` (pago del abono, comprobante enviado, cita confirmada, avisos). La lógica está en `src/lib/booking.ts`. El horario se aparta al llegar al pago (`hold_expires_at` = ahora + `pending_hold_hours`); al subir el comprobante, `hold_expires_at` pasa a nulo y queda apartado hasta que Giselle decida. La tasa se congela en `appointments.quote_eur_to_ves` y `quote_eur_to_usdt`. Los comprobantes van al almacén privado `receipts/<studio_id>/<appointment_id>/`.
 - Tasas: cargadas desde la fuente el 11 nov 2026. Se muestran en el inicio de la clienta y en la Agenda. La tarea diaria es un disparador programado de Cloudflare (`custom-worker.ts`, `triggers` en `wrangler.jsonc`) que llama a `POST /api/tasks/rates`; solo corre una vez publicado, y al publicar hay que subir `COTIZA_VE_API_KEY` como secreto.
-- Datos de prueba en la base: horario provisional de lunes a viernes 9:00–18:00, cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`, marcada como de confianza) y dos citas suyas el 12 nov 2026 (una con comprobante por aprobar, una confirmada). Sirven para probar el paso 6; borrarlos antes de abrir al público.
+- Datos de prueba en la base: horario provisional de lunes a viernes 9:00–18:00, cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`, marcada como de confianza) y tres citas suyas: dos el 12 nov 2026 (una con comprobante por aprobar, pagada con la conversión antigua a USDT, y una confirmada) y una el 13 nov sin comprobante, cuya reserva vence sola. Sirven para probar el paso 6; borrarlos antes de abrir al público.
 
 ## Reglas del negocio
 
@@ -43,9 +43,9 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Todos los precios están en euros. Se guardan en céntimos, como enteros.
 - La clienta paga el abono por Pago Móvil (bolívares) o por Binance (USDT).
 - Abono: monto fijo por cita, 10 € al inicio, configurable en Ajustes. No es reembolsable.
-- Tasas: fuente con datos del Banco Central de Venezuela: `GET https://api.cotizave.com/v2/fx/VE/rates` con la cabecera `X-API-Key`. Se leen `ve-euro` (euro BCV) y `ve-bcv` (dólar BCV) de `rates[]`; ver `src/lib/rates.ts`.
+- Tasas: fuente con datos del Banco Central de Venezuela: `GET https://api.cotizave.com/v2/fx/VE/rates` con la cabecera `X-API-Key`. Se lee `ve-euro` (euro BCV) de `rates[]`; ver `src/lib/rates.ts`.
   - Euro a bolívares = `tasas.EUR`.
-  - Euro a USDT = `tasas.EUR / tasas.USD`.
+  - Pagos en USDT (Binance): sin conversión. El precio en euros se cobra íntegro en dólares (10 € = 10 USDT). La tasa del euro existe para cobrar lo más alto posible en bolívares; que la clienta pague en dólares es lo preferido. Constante `EUR_TO_USDT = 1` en `src/lib/booking-config.ts`.
   - Una tarea diaria consulta la fuente y guarda las tasas. La app nunca consulta la fuente al cargar una página.
   - Se rechazan datos inválidos o con más de 10 días. En ese caso se conserva la tasa anterior.
   - Modo manual: si `rates_auto` es falso, la tarea no cambia nada.

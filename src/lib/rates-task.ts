@@ -1,4 +1,5 @@
 import "server-only";
+import { EUR_TO_USDT } from "./booking-config";
 import { fetchRates } from "./rates";
 import { STUDIO_SLUG } from "./studio";
 import { createAdminClient } from "./supabase/admin";
@@ -8,7 +9,7 @@ import { createAdminClient } from "./supabase/admin";
 const MIN_INTERVAL_MS = 60 * 60 * 1000;
 
 export type RatesTaskResult =
-  | { status: "updated"; eurToVes: number; eurToUsdt: number }
+  | { status: "updated"; eurToVes: number }
   | { status: "skipped"; reason: "manual" | "recent" }
   | { status: "kept"; reason: string } // la fuente falló o dio datos inválidos: se conserva la tasa anterior
   | { status: "error" };
@@ -50,7 +51,7 @@ export async function refreshStudioRates(now = new Date()): Promise<RatesTaskRes
       .from("studios")
       .update({
         eur_to_ves_rate: result.rates.eurToVes,
-        eur_to_usdt_rate: result.rates.eurToUsdt,
+        eur_to_usdt_rate: EUR_TO_USDT, // en USDT se cobra íntegro, sin conversión
         rates_source_updated_at: result.rates.sourceUpdatedAt,
         rates_fetched_at: now.toISOString(),
       })
@@ -60,7 +61,6 @@ export async function refreshStudioRates(now = new Date()): Promise<RatesTaskRes
     return {
       status: "updated",
       eurToVes: result.rates.eurToVes,
-      eurToUsdt: result.rates.eurToUsdt,
     };
   } catch (e) {
     console.error(`[tasas] ${e instanceof Error ? e.message : String(e)}`);

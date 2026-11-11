@@ -1,5 +1,5 @@
 // Tasas de cambio desde la fuente (datos del Banco Central de Venezuela).
-// Euro a bolívares = euro BCV. Euro a USDT = euro BCV / dólar BCV.
+// Euro a bolívares = euro BCV. Los pagos en USDT no usan tasa: se cobran íntegros.
 // La app nunca llama a la fuente al cargar una página: solo la tarea diaria.
 
 export const RATES_URL = "https://api.cotizave.com/v2/fx/VE/rates";
@@ -8,8 +8,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type Rates = {
   eurToVes: number; // bolívares por 1 €
-  eurToUsdt: number; // USDT por 1 €
-  sourceUpdatedAt: string; // fecha que reporta la fuente (la más antigua de las dos)
+  sourceUpdatedAt: string; // fecha que reporta la fuente
 };
 
 export type RatesResult = { ok: true; rates: Rates } | { ok: false; error: string };
@@ -31,26 +30,17 @@ export function parseRates(body: unknown, now: Date): RatesResult {
   if (!Array.isArray(list)) return { ok: false, error: "Respuesta sin tasas." };
 
   const euro = pick(list, "ve-euro");
-  const dollar = pick(list, "ve-bcv");
-  if (!euro || !dollar) return { ok: false, error: "Falta el euro o el dólar del BCV." };
+  if (!euro) return { ok: false, error: "Falta el euro del BCV." };
 
-  const oldest = Math.min(euro.updatedAt, dollar.updatedAt);
-  if (now.getTime() - oldest > MAX_AGE_DAYS * DAY_MS) {
+  if (now.getTime() - euro.updatedAt > MAX_AGE_DAYS * DAY_MS) {
     return { ok: false, error: `La tasa tiene más de ${MAX_AGE_DAYS} días.` };
-  }
-
-  const eurToUsdt = euro.mid / dollar.mid;
-  // Un euro siempre ronda el dólar; fuera de este rango, el dato está mal.
-  if (eurToUsdt < 0.5 || eurToUsdt > 2) {
-    return { ok: false, error: "La relación entre euro y dólar no es creíble." };
   }
 
   return {
     ok: true,
     rates: {
       eurToVes: Math.round(euro.mid * 1e4) / 1e4,
-      eurToUsdt: Math.round(eurToUsdt * 1e6) / 1e6,
-      sourceUpdatedAt: new Date(oldest).toISOString(),
+      sourceUpdatedAt: new Date(euro.updatedAt).toISOString(),
     },
   };
 }
