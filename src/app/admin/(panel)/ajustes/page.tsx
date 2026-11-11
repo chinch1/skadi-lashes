@@ -15,7 +15,7 @@ export default function Page() {
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Mi horario</span>
           <span className="block text-sm text-muted">
-            Días y horas en que atiendes, y bloqueos.
+            Las horas que ofreces cada día.
           </span>
         </span>
         <span aria-hidden="true" className="text-xl text-muted">
