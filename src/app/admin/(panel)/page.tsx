@@ -1,4 +1,4 @@
-import { formatBolivars, formatLongDate, formatUsdt } from "@/lib/format";
+import { formatBolivars, formatLongDate } from "@/lib/format";
 import { getStudioRates } from "@/lib/studio-rates";
 
 export default async function Page() {
@@ -23,9 +23,9 @@ export default async function Page() {
             <p className="mt-1 text-lg font-semibold">
               1 € = {formatBolivars(rates.eurToVes)}
             </p>
-            {rates.eurToUsdt && (
-              <p className="text-muted">1 € = {formatUsdt(rates.eurToUsdt)}</p>
-            )}
+            <p className="text-muted">
+              En USDT se cobra el mismo monto, sin conversión.
+            </p>
             {rates.updatedOn && (
               <p className="mt-1 text-sm text-muted">
                 Actualizada el {formatLongDate(rates.updatedOn)}. Se renueva

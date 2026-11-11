@@ -1,4 +1,5 @@
 import "server-only";
+import { EUR_TO_USDT } from "@/lib/booking-config";
 import { getMonthAvailability } from "@/lib/availability-data";
 import { normalizePhone } from "@/lib/phone";
 import { STUDIO_SLUG } from "@/lib/studio";
@@ -197,7 +198,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
     const { data: studio, error: studioError } = await supabase
       .from("studios")
-      .select("id, timezone, deposit_cents, pending_hold_hours, eur_to_ves_rate, eur_to_usdt_rate")
+      .select("id, timezone, deposit_cents, pending_hold_hours, eur_to_ves_rate")
       .eq("slug", STUDIO_SLUG)
       .maybeSingle();
     if (studioError) return bookingFailure("estudio", studioError.message);
@@ -269,7 +270,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
           ).toISOString(),
           // La tasa se congela aquí, al llegar al paso de pago.
           quote_eur_to_ves: toNumber(studio.eur_to_ves_rate),
-          quote_eur_to_usdt: toNumber(studio.eur_to_usdt_rate),
+          quote_eur_to_usdt: EUR_TO_USDT,
         };
 
     const { data: appointment, error: appointmentError } = await supabase
