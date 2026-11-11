@@ -77,7 +77,7 @@ describe("confirmationMessage", () => {
     "Servicios: Pestañas clásicas, Retiro.\n\n" +
     `${rule("Puntualidad")}\n` +
     `${rule("Acompañantes")}\n\n` +
-    "Puedes ver tu cita aquí: https://skadi.example/cita/abc";
+    "Si necesitas cambiar tu cita o no puedes venir, hazlo desde aquí: https://skadi.example/cita/abc";
 
   it("con el texto por defecto arma fecha larga, hora de 12 horas, servicios y normas", () => {
     expect(confirmationMessage(appointment)).toBe(expected);

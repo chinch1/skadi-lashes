@@ -28,7 +28,7 @@ export const DEFAULT_CONFIRMATION_TEMPLATE =
   "Servicios: {servicios}.\n\n" +
   `${ruleText("Puntualidad")}\n` +
   `${ruleText("Acompañantes")}\n\n` +
-  "Puedes ver tu cita aquí: {enlace}";
+  "Si necesitas cambiar tu cita o no puedes venir, hazlo desde aquí: {enlace}";
 
 export const DEFAULT_REJECTION_TEMPLATE =
   "Hola {nombre}, no pude verificar el comprobante de tu abono para la cita del {fecha} a las {hora}, así que el horario quedó libre.\n\n" +
