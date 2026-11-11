@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { inputClass, primaryButton } from "@/components/ui";
 import type { FindResult, FoundAppointment } from "@/lib/reschedule";
 import { formatLongDate, formatTime12 } from "@/lib/format";
+import { FOREIGN_PHONE_HINT, formatPhoneInput } from "@/lib/phone";
 import { findAppointments } from "./actions";
 
 const focusRing =
@@ -68,13 +69,13 @@ export function FindAppointment() {
             autoComplete="tel"
             placeholder="0412-1234567"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhoneInput(e.target.value, phone))}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "telefono-ayuda telefono-error" : "telefono-ayuda"}
             className={`${inputClass} ${error ? "border-red-700" : ""}`}
           />
           <p id="telefono-ayuda" className="text-sm text-muted">
-            Es el número con el que agendaste.
+            Es el número con el que agendaste. {FOREIGN_PHONE_HINT}
           </p>
           {error && (
             <p id="telefono-error" role="alert" className="text-sm text-red-700">

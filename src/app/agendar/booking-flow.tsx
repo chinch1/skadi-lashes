@@ -7,6 +7,7 @@ import { inputClass, primaryButton } from "@/components/ui";
 import type { BookingResult } from "@/lib/booking";
 import { formatLongDate, formatTime12 } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
+import { FOREIGN_PHONE_HINT, formatPhoneInput } from "@/lib/phone";
 import { RULES } from "@/lib/rules";
 import { formatDuration, photoUrl, type Section, type Service } from "@/lib/services";
 import { bookAppointment } from "./actions";
@@ -366,7 +367,8 @@ export function BookingFlow({
               id="telefono"
               label="Número de WhatsApp"
               value={phone}
-              onChange={setPhone}
+              onChange={(value) => setPhone(formatPhoneInput(value, phone))}
+              hint={FOREIGN_PHONE_HINT}
               autoComplete="tel"
               type="tel"
               inputMode="tel"
@@ -512,6 +514,7 @@ function TextField({
   value,
   onChange,
   error,
+  hint,
   inputRef,
   ...rest
 }: {
@@ -520,6 +523,7 @@ function TextField({
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  hint?: string;
   inputRef: React.Ref<HTMLInputElement>;
   autoComplete: string;
   type?: string;
@@ -527,6 +531,8 @@ function TextField({
   placeholder?: string;
 }) {
   const errorId = `${id}-error`;
+  const hintId = `${id}-hint`;
+  const describedBy = [hint && hintId, error && errorId].filter(Boolean).join(" ");
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="font-medium">
@@ -538,10 +544,15 @@ function TextField({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={describedBy || undefined}
         className={`${inputClass} ${error ? "border-red-700" : ""}`}
         {...rest}
       />
+      {hint && (
+        <p id={hintId} className="text-sm text-muted">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={errorId} role="alert" className="text-sm text-red-700">
           {error}

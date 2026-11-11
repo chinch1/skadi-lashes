@@ -47,3 +47,31 @@ export function formatPhone(e164: string): string {
   }
   return e164;
 }
+
+export const FOREIGN_PHONE_HINT =
+  "Si tu número es de otro país, escríbelo con + y el código, por ejemplo +34 612 345 678.";
+
+// Ayuda mientras la clienta escribe. No bloquea nada: solo ordena lo que teclea.
+// - Número venezolano: pone el guion solo ("0412-1234567").
+// - Número con "+": lo deja libre, para clientas de otros países.
+// Al borrar no se reacomoda, para que pueda corregir sin que el guion vuelva.
+export function formatPhoneInput(next: string, previous = ""): string {
+  const value = next.trimStart();
+
+  if (value.startsWith("+")) {
+    const rest = value.slice(1).replace(/[^\d ]/g, "").replace(/ {2,}/g, " ");
+    return `+${rest}`.slice(0, 20);
+  }
+
+  const typing = value.length > previous.length;
+  if (!typing) return value.replace(/[^\d -]/g, "");
+
+  const digits = value.replace(/\D/g, "").slice(0, 15);
+  if (digits.startsWith("04") && digits.length > 4 && digits.length <= 11) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+  if (digits.startsWith("4") && digits.length > 3 && digits.length <= 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+  return digits;
+}
