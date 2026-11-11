@@ -12,6 +12,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#6F4A2F",
+  // Permite respetar el área segura del teléfono en las barras inferiores.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

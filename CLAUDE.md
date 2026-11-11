@@ -27,11 +27,14 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - La cuenta de Giselle existe y está vinculada al estudio en `admins`.
 - `studios.deposit_cents` = 1000 (10 €).
 - Los cambios posteriores ya están aplicados y verificados (11 nov 2026): `clients.deposit_exempt`, las columnas de tasas en `studios` y las de pago en `deposits`.
-- Faltan por cargar: datos de Pago Móvil y Binance, tasas de cambio, horario de trabajo, servicios reales.
+- Datos de Pago Móvil y Binance: ya cargados. Faltan por cargar: horario real y servicios reales.
 - Paso 1 hecho: proyecto Next.js, clientes de Supabase y adaptador de Cloudflare. Publicado en https://skadi-lashes.nicolaandresr.workers.dev con `npm run deploy`. `SUPABASE_SERVICE_ROLE_KEY` está cargada como secreto en Cloudflare.
 - Paso 2 hecho y publicado: inicio de sesión en `/admin/login`, `/admin` protegido y las cinco pestañas con texto provisional. No se usa `proxy.ts` (experimental en el adaptador de Cloudflare): una sesión vencida se renueva en la ruta `/admin/sesion`. Toda acción del servidor de `/admin` debe llamar a `requireAdminAction()` de `src/lib/auth.ts`.
 - Paso 3 hecho y publicado: pantalla Servicios en `/admin/servicios`. Secciones y servicios se ordenan arrastrando (dnd-kit). La foto se reduce en el navegador (lado mayor 1280 px, JPEG) y se sube por el servidor con la llave de servicio a `service-photos/<studio_id>/<service_id>/`; no hay políticas de almacenamiento. La foto es opcional al guardar (por confirmar con Giselle).
 - Paso 4 hecho, sin publicar: pantalla "Mi horario" en `/admin/ajustes/horario` (horario semanal con una pausa opcional por día, bloqueos y vista previa "Así lo ven las clientas"), cálculo de cupos en `src/lib/availability.ts` con pruebas (`npm test`) y ruta pública `GET /api/availability?month=AAAA-MM&services=<ids>`. Intervalo (30 min), descanso (0) y anticipación mínima (60 min) son constantes en `src/lib/booking-config.ts`, por confirmar. Una cita `pending_deposit` con reserva vencida no ocupa cupo en el cálculo, pero la restricción de la base de datos sí la cuenta: el paso 5 debe liberarla antes de reservar.
+- Paso 5 hecho, sin publicar: flujo de agendar en `/agendar` (servicios, calendario, datos) y página privada de la cita en `/cita/<manage_token>` (pago del abono, comprobante enviado, cita confirmada, avisos). La lógica está en `src/lib/booking.ts`. El horario se aparta al llegar al pago (`hold_expires_at` = ahora + `pending_hold_hours`); al subir el comprobante, `hold_expires_at` pasa a nulo y queda apartado hasta que Giselle decida. La tasa se congela en `appointments.quote_eur_to_ves` y `quote_eur_to_usdt`. Los comprobantes van al almacén privado `receipts/<studio_id>/<appointment_id>/`.
+- Tasas: cargadas desde la fuente el 11 nov 2026. Se muestran en el inicio de la clienta y en la Agenda. La tarea diaria es un disparador programado de Cloudflare (`custom-worker.ts`, `triggers` en `wrangler.jsonc`) que llama a `POST /api/tasks/rates`; solo corre una vez publicado, y al publicar hay que subir `COTIZA_VE_API_KEY` como secreto.
+- Datos de prueba en la base: horario provisional de lunes a viernes 9:00–18:00, cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`, marcada como de confianza) y dos citas suyas el 12 nov 2026 (una con comprobante por aprobar, una confirmada). Sirven para probar el paso 6; borrarlos antes de abrir al público.
 
 ## Reglas del negocio
 
@@ -40,7 +43,7 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Todos los precios están en euros. Se guardan en céntimos, como enteros.
 - La clienta paga el abono por Pago Móvil (bolívares) o por Binance (USDT).
 - Abono: monto fijo por cita, 10 € al inicio, configurable en Ajustes. No es reembolsable.
-- Tasas: fuente con datos del Banco Central de Venezuela.
+- Tasas: fuente con datos del Banco Central de Venezuela: `GET https://api.cotizave.com/v2/fx/VE/rates` con la cabecera `X-API-Key`. Se leen `ve-euro` (euro BCV) y `ve-bcv` (dólar BCV) de `rates[]`; ver `src/lib/rates.ts`.
   - Euro a bolívares = `tasas.EUR`.
   - Euro a USDT = `tasas.EUR / tasas.USD`.
   - Una tarea diaria consulta la fuente y guarda las tasas. La app nunca consulta la fuente al cargar una página.
@@ -140,7 +143,7 @@ Solo nombres. Los valores nunca van en el repositorio.
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (solo servidor)
-- `RATES_API_KEY` (solo servidor)
+- `COTIZA_VE_API_KEY` (solo servidor): llave de la fuente de tasas
 
 Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. El público solo lee estudio, secciones y servicios visibles.
 
@@ -148,7 +151,6 @@ Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. 
 
 - Horario real de Giselle (la pantalla "Mi horario" ya existe; falta cargarlo).
 - Horario especial por fecha: Giselle arma el calendario de un mes completo con antelación (por ejemplo, diciembre desde noviembre). El horario semanal es uno solo y los bloqueos solo quitan tiempo; falta poder dar a una fecha o rango unas horas distintas. Decidido con Nico: pulir después de ver el paso 4 funcionando.
-- Fuente de tasas: dirección definitiva, cómo recibe la llave y cada cuánto se actualiza. Una respuesta observada tenía 7 días de atraso.
 - Mensaje de confirmación al aprobar un abono (botón "Aprobar y avisar") y mensaje al rechazar.
 - Enlace privado por cita (`manage_token`) para gestionar la cita sin escribir el número.
 - Pantalla "Cita confirmada" para la clienta sin abono.
