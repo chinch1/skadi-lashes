@@ -7,11 +7,14 @@ import { default as handler } from "./.open-next/worker.js";
 export default {
   fetch: handler.fetch,
 
-  // Tarea diaria: actualizar las tasas de cambio llamando a la ruta interna.
+  // Tareas diarias: actualizar las tasas de cambio y hacer la limpieza
+  // (comprobantes viejos y reservas vencidas), llamando a las rutas internas.
   async scheduled(_event, env, ctx) {
-    const request = new Request("https://skadi-lashes.internal/api/tasks/rates", {
-      method: "POST",
-    });
-    ctx.waitUntil(handler.fetch(request, env, ctx));
+    for (const path of ["/api/tasks/rates", "/api/tasks/cleanup"]) {
+      const request = new Request(`https://skadi-lashes.internal${path}`, {
+        method: "POST",
+      });
+      ctx.waitUntil(handler.fetch(request, env, ctx));
+    }
   },
 };
