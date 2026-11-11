@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-primary: #6f4a2f;
+  --color-background: #faf7f3;
+  --color-foreground: #211b17;
+  --color-muted: #6a5d52;
+  --color-tint: #f1e7dc;
+  --color-border: #e3d7c9;
+  --color-border-strong: #c9b8a5;
+  --color-whatsapp: #0f7a3f;
+  --font-sans: var(--font-dm-sans);
+  --font-display: var(--font-outfit);
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
