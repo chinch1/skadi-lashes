@@ -96,7 +96,22 @@ create table services (
 create index services_by_section on services (studio_id, section_id, position);
 
 -- ---------------------------------------------------------------------
--- Horario de trabajo y bloqueos
+-- Horas que se ofrecen, día por día
+-- La dueña marca a mano las horas de inicio de cada fecha. Es lo único que
+-- decide qué cupos ve la clienta.
+-- ---------------------------------------------------------------------
+create table day_slots (
+  id          uuid primary key default gen_random_uuid(),
+  studio_id   uuid not null references studios (id) on delete cascade,
+  day         date not null,   -- fecha local del estudio
+  start_time  time not null,   -- hora local de inicio que se ofrece
+  unique (studio_id, day, start_time)
+);
+
+create index day_slots_by_day on day_slots (studio_id, day);
+
+-- ---------------------------------------------------------------------
+-- Horario semanal y bloqueos (EN DESUSO: reemplazados por day_slots)
 -- ---------------------------------------------------------------------
 create table working_hours (
   id         uuid primary key default gen_random_uuid(),
@@ -244,6 +259,7 @@ alter table sections             enable row level security;
 alter table services             enable row level security;
 alter table working_hours        enable row level security;
 alter table time_blocks          enable row level security;
+alter table day_slots            enable row level security;
 alter table clients              enable row level security;
 alter table appointments         enable row level security;
 alter table appointment_services enable row level security;
@@ -269,6 +285,8 @@ create policy services_admin_all on services for all
 create policy working_hours_admin_all on working_hours for all
   using (is_admin(studio_id)) with check (is_admin(studio_id));
 create policy time_blocks_admin_all on time_blocks for all
+  using (is_admin(studio_id)) with check (is_admin(studio_id));
+create policy day_slots_admin_all on day_slots for all
   using (is_admin(studio_id)) with check (is_admin(studio_id));
 create policy clients_admin_all on clients for all
   using (is_admin(studio_id)) with check (is_admin(studio_id));
