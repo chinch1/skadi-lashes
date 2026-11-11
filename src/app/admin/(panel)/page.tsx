@@ -219,8 +219,7 @@ export default async function Page(props: PageProps<"/admin">) {
             </p>
             {rates.updatedOn && (
               <p className="mt-1 text-sm text-muted">
-                Actualizada el {formatLongDate(rates.updatedOn)}. Se renueva
-                sola cada día.
+                Actualizada el {formatLongDate(rates.updatedOn)}.
               </p>
             )}
           </>
