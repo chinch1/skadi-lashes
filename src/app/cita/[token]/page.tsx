@@ -6,8 +6,9 @@ import { primaryButton, secondaryButton } from "@/components/ui";
 import { getBookingView, type BookingView } from "@/lib/booking";
 import { formatLongDate, formatTime12 } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
-import { RULES } from "@/lib/rules";
+import { buildRules, type Rule } from "@/lib/rules";
 import { formatDuration } from "@/lib/services";
+import { getRuleSettings } from "@/lib/studio-settings";
 import { PaymentForm } from "./payment-form";
 
 // La página siempre muestra el estado actual de la cita.
@@ -20,10 +21,6 @@ export const metadata: Metadata = {
 };
 
 const STUDIO_TIME_ZONE = "America/Caracas";
-
-function rule(title: string) {
-  return RULES.find((r) => r.title === title);
-}
 
 // Fecha "YYYY-MM-DD" y hora "HH:MM" de un instante, en la hora del estudio.
 function studioParts(instant: Date): { date: string; time: string } {
@@ -95,11 +92,11 @@ function Summary({ view }: { view: BookingView }) {
   );
 }
 
-function RuleList({ titles }: { titles: string[] }) {
+function RuleList({ rules, titles }: { rules: readonly Rule[]; titles: string[] }) {
   return (
     <dl className="flex flex-col gap-3 rounded-2xl bg-tint p-5">
       {titles.map((title) => {
-        const r = rule(title);
+        const r = rules.find((rule) => rule.title === title);
         if (!r) return null;
         return (
           <div key={r.title}>
@@ -135,7 +132,10 @@ function CantComeLink({ token }: { token: string }) {
 
 // Encabezado (título y texto) y cuerpo (normas, formulario, enlaces) de cada estado.
 // El resumen de la cita va entre los dos.
-function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode } {
+function stateContent(
+  view: BookingView,
+  rules: readonly Rule[],
+): { header: ReactNode; body?: ReactNode } {
   switch (view.state) {
     case "awaiting_payment": {
       const deadline = view.holdExpiresAt ? holdDeadline(view.holdExpiresAt) : null;
@@ -161,7 +161,7 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
         ),
         body: (
           <>
-            <RuleList titles={["Abono"]} />
+            <RuleList rules={rules} titles={["Abono"]} />
             {pagoMovil || binance ? (
               <PaymentForm
                 token={view.token}
@@ -201,7 +201,7 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
         ),
         body: (
           <>
-            <RuleList titles={["Puntualidad", "Acompañantes"]} />
+            <RuleList rules={rules} titles={["Puntualidad", "Acompañantes"]} />
             <Link href={`/cita/${view.token}/reprogramar`} className={secondaryButton}>
               Reprogramar o avisar que no puedo ir
             </Link>
@@ -243,10 +243,10 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
 export default async function Page(props: PageProps<"/cita/[token]">) {
   const { token } = await props.params;
   const { cambio } = await props.searchParams;
-  const view = await getBookingView(token);
+  const [view, settings] = await Promise.all([getBookingView(token), getRuleSettings()]);
   if (!view) notFound();
 
-  const { header, body } = stateContent(view);
+  const { header, body } = stateContent(view, buildRules(settings));
   // Viene de reprogramar sin abono nuevo: se confirma el cambio arriba.
   const changed = cambio === "ok" && view.state === "confirmed";
 

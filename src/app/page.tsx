@@ -2,14 +2,16 @@ import Image from "next/image";
 import Link from "next/link";
 import logo from "@/assets/logo.png";
 import { formatBolivars, formatLongDate } from "@/lib/format";
-import { RULES } from "@/lib/rules";
+import { buildRules } from "@/lib/rules";
 import { getStudioRates } from "@/lib/studio-rates";
+import { getRuleSettings } from "@/lib/studio-settings";
 
 // La tasa cambia cada día: la página se arma en cada visita.
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const rates = await getStudioRates();
+  const [rates, settings] = await Promise.all([getStudioRates(), getRuleSettings()]);
+  const rules = buildRules(settings);
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-10">
@@ -57,7 +59,7 @@ export default async function Home() {
           Normas del estudio
         </h2>
         <dl className="mt-3 flex flex-col gap-3">
-          {RULES.map((rule) => (
+          {rules.map((rule) => (
             <div key={rule.title}>
               <dt className="font-medium">{rule.title}</dt>
               <dd className="text-muted">{rule.text}</dd>
