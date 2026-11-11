@@ -23,3 +23,25 @@ h2,
 h3 {
   font-family: var(--font-display);
 }
+
+/* En iPhone, los selectores de fecha y hora ignoran el ancho de su caja, se
+   salen de la tarjeta y centran el texto. Esto los obliga a comportarse como
+   cualquier otro campo. */
+@layer base {
+  input[type="time"],
+  input[type="date"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  input[type="time"]::-webkit-date-and-time-value,
+  input[type="date"]::-webkit-date-and-time-value {
+    min-height: 1.5em;
+    text-align: left;
+  }
+}
