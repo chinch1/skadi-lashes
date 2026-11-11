@@ -5,6 +5,8 @@ import { requireAdminAction } from "@/lib/auth";
 import {
   DEFAULT_CONFIRMATION_TEMPLATE,
   DEFAULT_REJECTION_TEMPLATE,
+  DEFAULT_REMINDER_TEMPLATE,
+  DEFAULT_RETOUCH_TEMPLATE,
   MESSAGE_MAX_LENGTH,
 } from "@/lib/whatsapp";
 
@@ -13,7 +15,15 @@ export type MessageState = { error: string | null; saved: boolean };
 const SETTINGS = {
   confirmation: { column: "confirmation_message", fallback: DEFAULT_CONFIRMATION_TEMPLATE },
   rejection: { column: "rejection_message", fallback: DEFAULT_REJECTION_TEMPLATE },
+  reminder: { column: "reminder_message", fallback: DEFAULT_REMINDER_TEMPLATE },
+  retouch: { column: "retouch_message", fallback: DEFAULT_RETOUCH_TEMPLATE },
 } as const;
+
+export type MessageKind = keyof typeof SETTINGS;
+
+function isMessageKind(value: unknown): value is MessageKind {
+  return typeof value === "string" && Object.hasOwn(SETTINGS, value);
+}
 
 // Guarda el texto de un mensaje de WhatsApp. Vacío o igual al de la app se
 // guarda como null: así, si la app cambia su texto, Giselle recibe el nuevo.
@@ -24,7 +34,7 @@ export async function saveMessageTemplate(
   const { supabase, studioId } = await requireAdminAction();
 
   const kind = formData.get("kind");
-  if (kind !== "confirmation" && kind !== "rejection") {
+  if (!isMessageKind(kind)) {
     return { error: "No se pudo guardar. Recarga la página.", saved: false };
   }
   const { column, fallback } = SETTINGS[kind];
@@ -53,5 +63,6 @@ export async function saveMessageTemplate(
 
   revalidatePath("/admin/ajustes/mensajes");
   revalidatePath("/admin");
+  revalidatePath("/admin/recordatorios");
   return { error: null, saved: true };
 }

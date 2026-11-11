@@ -4,9 +4,13 @@ import { RULES } from "./rules";
 import {
   DEFAULT_CONFIRMATION_TEMPLATE,
   DEFAULT_REJECTION_TEMPLATE,
+  DEFAULT_REMINDER_TEMPLATE,
+  DEFAULT_RETOUCH_TEMPLATE,
   PLACEHOLDERS,
   confirmationMessage,
   rejectionMessage,
+  reminderMessage,
+  retouchMessage,
   renderTemplate,
   waLink,
 } from "./whatsapp";
@@ -136,5 +140,66 @@ describe("rejectionMessage", () => {
         enlace: "https://skadi.example/agendar",
       }),
     );
+  });
+});
+
+describe("reminderMessage", () => {
+  const expected =
+    "Hola María, te recuerdo tu cita en Skadi Lashes mañana, jueves 12 de noviembre, a las 12:00 pm.\n\n" +
+    "Servicios: Pestañas clásicas, Retiro.\n\n" +
+    `${rule("Puntualidad")}\n` +
+    `${rule("Acompañantes")}\n\n` +
+    "Si necesitas cambiarla o no puedes venir, hazlo desde aquí: https://skadi.example/cita/abc";
+
+  it("con el texto por defecto arma fecha, hora, servicios, normas y el enlace de su cita", () => {
+    expect(reminderMessage(appointment)).toBe(expected);
+  });
+
+  it("usa el texto de Giselle cuando lo hay", () => {
+    expect(reminderMessage(appointment, "{nombre}, mañana a las {hora}. {enlace}")).toBe(
+      "María, mañana a las 12:00 pm. https://skadi.example/cita/abc",
+    );
+  });
+
+  it("con un texto vacío, nulo o de solo espacios vuelve al de la app", () => {
+    expect(reminderMessage(appointment, "")).toBe(expected);
+    expect(reminderMessage(appointment, null)).toBe(expected);
+    expect(reminderMessage(appointment, " \n ")).toBe(expected);
+  });
+
+  it("el texto por defecto lleva el enlace", () => {
+    expect(DEFAULT_REMINDER_TEMPLATE).toContain("{enlace}");
+  });
+});
+
+describe("retouchMessage", () => {
+  const retouch = {
+    ...appointment,
+    date: "2026-10-21",
+    services: ["Pestañas clásicas"],
+    link: "https://skadi.example/agendar",
+  };
+  const expected =
+    "Hola María, ya pasó un tiempo desde tu cita del miércoles 21 de octubre en Skadi Lashes (Pestañas clásicas). Es buen momento para tu retoque.\n\n" +
+    "Puedes agendar aquí: https://skadi.example/agendar";
+
+  it("con el texto por defecto nombra la cita a la que asistió y da el enlace para agendar", () => {
+    expect(retouchMessage(retouch)).toBe(expected);
+  });
+
+  it("usa el texto de Giselle cuando lo hay", () => {
+    expect(retouchMessage(retouch, "{nombre}: ¿retoque de {servicios}? {enlace}")).toBe(
+      "María: ¿retoque de Pestañas clásicas? https://skadi.example/agendar",
+    );
+  });
+
+  it("con un texto vacío o nulo vuelve al de la app", () => {
+    expect(retouchMessage(retouch, "")).toBe(expected);
+    expect(retouchMessage(retouch, null)).toBe(expected);
+    expect(retouchMessage(retouch, "   ")).toBe(expected);
+  });
+
+  it("el texto por defecto lleva el enlace", () => {
+    expect(DEFAULT_RETOUCH_TEMPLATE).toContain("{enlace}");
   });
 });

@@ -34,6 +34,17 @@ export const DEFAULT_REJECTION_TEMPLATE =
   "Hola {nombre}, no pude verificar el comprobante de tu abono para la cita del {fecha} a las {hora}, así que el horario quedó libre.\n\n" +
   "Si quieres, puedes agendar de nuevo aquí: {enlace}";
 
+export const DEFAULT_REMINDER_TEMPLATE =
+  "Hola {nombre}, te recuerdo tu cita en Skadi Lashes mañana, {fecha}, a las {hora}.\n\n" +
+  "Servicios: {servicios}.\n\n" +
+  `${ruleText("Puntualidad")}\n` +
+  `${ruleText("Acompañantes")}\n\n` +
+  "Si necesitas cambiarla o no puedes venir, hazlo desde aquí: {enlace}";
+
+export const DEFAULT_RETOUCH_TEMPLATE =
+  "Hola {nombre}, ya pasó un tiempo desde tu cita del {fecha} en Skadi Lashes ({servicios}). Es buen momento para tu retoque.\n\n" +
+  "Puedes agendar aquí: {enlace}";
+
 export const PLACEHOLDERS: { key: string; label: string; example: string }[] = [
   { key: "nombre", label: "Nombre", example: "María" },
   { key: "fecha", label: "Fecha", example: "jueves 12 de noviembre" },
@@ -81,6 +92,23 @@ export function rejectionMessage(
   template?: string | null,
 ): string {
   return renderTemplate(pick(template, DEFAULT_REJECTION_TEMPLATE), valuesFor(a));
+}
+
+// Recordatorio de la cita de mañana. `link` es la página de su cita.
+export function reminderMessage(
+  a: MessageAppointment,
+  template?: string | null,
+): string {
+  return renderTemplate(pick(template, DEFAULT_REMINDER_TEMPLATE), valuesFor(a));
+}
+
+// Recordatorio de retoque. Fecha y hora son las de la cita a la que asistió;
+// `link` es el enlace público para agendar.
+export function retouchMessage(
+  a: MessageAppointment,
+  template?: string | null,
+): string {
+  return renderTemplate(pick(template, DEFAULT_RETOUCH_TEMPLATE), valuesFor(a));
 }
 
 // "+584121234567" -> "https://wa.me/584121234567?text=…"
