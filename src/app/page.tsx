@@ -1,9 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/assets/logo.png";
+import { formatBolivars, formatLongDate } from "@/lib/format";
 import { RULES } from "@/lib/rules";
+import { getStudioRates } from "@/lib/studio-rates";
 
-export default function Home() {
+// La tasa cambia cada día: la página se arma en cada visita.
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const rates = await getStudioRates();
+
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-10">
       <header>
@@ -33,6 +40,17 @@ export default function Home() {
           Reprogramar una cita
         </Link>
       </nav>
+
+      {rates && (
+        <p className="-mt-3 text-center text-sm text-muted">
+          Tasa BCV: 1 € = {formatBolivars(rates.eurToVes)}
+          {rates.updatedOn && (
+            <span className="block">
+              Actualizada el {formatLongDate(rates.updatedOn)}
+            </span>
+          )}
+        </p>
+      )}
 
       <section aria-labelledby="normas" className="rounded-2xl bg-tint p-5">
         <h2 id="normas" className="text-lg font-semibold">
