@@ -8,7 +8,9 @@ import {
   type RetouchReminder,
   type TomorrowAppointment,
 } from "@/lib/reminders";
-import { reminderMessage, retouchMessage, waLink } from "@/lib/whatsapp";
+import { buildRules } from "@/lib/rules";
+import { getRuleSettings } from "@/lib/studio-settings";
+import { normsText, reminderMessage, retouchMessage, waLink } from "@/lib/whatsapp";
 import { ReminderActions } from "./reminder-actions";
 
 const card = "rounded-2xl border border-border bg-white p-4";
@@ -67,10 +69,13 @@ function RetouchCard({ item, href }: { item: RetouchReminder; href: string }) {
 
 export default async function Page() {
   const { supabase, studioId } = await requireAdminPage();
-  const [data, origin] = await Promise.all([
+  const [data, origin, ruleSettings] = await Promise.all([
     getReminders(supabase, studioId),
     siteOrigin(),
+    getRuleSettings(),
   ]);
+  // Normas con el cargo y los minutos de Ajustes, para {normas}.
+  const norms = normsText(buildRules(ruleSettings));
   const templates = data.messageTemplates;
   const hasTomorrow =
     data.toRemind.length + data.noReminders.length + data.reminded.length > 0;
@@ -108,6 +113,7 @@ export default async function Page() {
                             time: a.time,
                             services: a.services,
                             link: `${origin}/cita/${a.token}`,
+                            norms,
                           },
                           templates.reminder,
                         ),
@@ -192,6 +198,7 @@ export default async function Page() {
                       time: item.time,
                       services: item.services,
                       link: `${origin}/agendar`,
+                      norms,
                     },
                     templates.retouch,
                   ),

@@ -2,11 +2,14 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { smallButton } from "@/components/ui";
 import { requireAdminPage } from "@/lib/auth";
+import { buildRules } from "@/lib/rules";
+import { getRuleSettings } from "@/lib/studio-settings";
 import {
   DEFAULT_CONFIRMATION_TEMPLATE,
   DEFAULT_REJECTION_TEMPLATE,
   DEFAULT_REMINDER_TEMPLATE,
   DEFAULT_RETOUCH_TEMPLATE,
+  normsText,
 } from "@/lib/whatsapp";
 import { MessageForm } from "./message-form";
 
@@ -24,14 +27,17 @@ async function siteOrigin(): Promise<string> {
 
 export default async function Page() {
   const { supabase, studioId } = await requireAdminPage();
-  const [{ data: studio, error }, origin] = await Promise.all([
+  const [{ data: studio, error }, origin, ruleSettings] = await Promise.all([
     supabase
       .from("studios")
       .select("confirmation_message, rejection_message, reminder_message, retouch_message")
       .eq("id", studioId)
       .maybeSingle(),
     siteOrigin(),
+    getRuleSettings(),
   ]);
+  // La vista previa de {normas} usa el cargo y los minutos de Ajustes.
+  const previewNorms = normsText(buildRules(ruleSettings));
   const loadError = error || !studio;
 
   return (
@@ -58,6 +64,7 @@ export default async function Page() {
             initialText={studio.confirmation_message || DEFAULT_CONFIRMATION_TEMPLATE}
             defaultText={DEFAULT_CONFIRMATION_TEMPLATE}
             previewLink={`${origin}/cita/abc123`}
+            previewNorms={previewNorms}
           />
           <MessageForm
             kind="rejection"
@@ -66,6 +73,7 @@ export default async function Page() {
             initialText={studio.rejection_message || DEFAULT_REJECTION_TEMPLATE}
             defaultText={DEFAULT_REJECTION_TEMPLATE}
             previewLink={`${origin}/agendar`}
+            previewNorms={previewNorms}
           />
           <MessageForm
             kind="reminder"
@@ -74,6 +82,7 @@ export default async function Page() {
             initialText={studio.reminder_message || DEFAULT_REMINDER_TEMPLATE}
             defaultText={DEFAULT_REMINDER_TEMPLATE}
             previewLink={`${origin}/cita/abc123`}
+            previewNorms={previewNorms}
           />
           <MessageForm
             kind="retouch"
@@ -82,6 +91,7 @@ export default async function Page() {
             initialText={studio.retouch_message || DEFAULT_RETOUCH_TEMPLATE}
             defaultText={DEFAULT_RETOUCH_TEMPLATE}
             previewLink={`${origin}/agendar`}
+            previewNorms={previewNorms}
           />
         </div>
       )}

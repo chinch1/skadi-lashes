@@ -1,5 +1,5 @@
 import { formatLongDate, formatTime12 } from "./format";
-import { RULES } from "./rules";
+import { RULES, ruleText, type Rule } from "./rules";
 
 // Mensajes de WhatsApp que Giselle envía con un enlace wa.me.
 // Solo texto: no se usa el servicio de pago de Meta.
@@ -12,22 +12,25 @@ export type MessageAppointment = {
   time: string; // "HH:MM", hora local
   services: string[];
   link: string; // dirección completa: /cita/<token> o /agendar
+  // Normas para {normas}, armadas con los ajustes actuales (normsText).
+  // Sin este campo se usan las de la app.
+  norms?: string;
 };
 
 // Largo máximo de un texto guardado por Giselle.
 export const MESSAGE_MAX_LENGTH = 1200;
 
-function ruleText(title: (typeof RULES)[number]["title"]): string {
-  const rule = RULES.find((r) => r.title === title);
-  if (!rule) throw new Error(`Falta la norma "${title}".`);
-  return rule.text;
+// Lo que reemplaza a {normas}: Puntualidad y Acompañantes, una por línea.
+export function normsText(rules: readonly Rule[]): string {
+  return `${ruleText(rules, "Puntualidad")}\n${ruleText(rules, "Acompañantes")}`;
 }
+
+const DEFAULT_NORMS = normsText(RULES);
 
 export const DEFAULT_CONFIRMATION_TEMPLATE =
   "Hola {nombre}, tu cita en Skadi Lashes quedó confirmada para el {fecha} a las {hora}.\n\n" +
   "Servicios: {servicios}.\n\n" +
-  `${ruleText("Puntualidad")}\n` +
-  `${ruleText("Acompañantes")}\n\n` +
+  "{normas}\n\n" +
   "Si necesitas cambiar tu cita o no puedes venir, hazlo desde aquí: {enlace}";
 
 export const DEFAULT_REJECTION_TEMPLATE =
@@ -37,8 +40,7 @@ export const DEFAULT_REJECTION_TEMPLATE =
 export const DEFAULT_REMINDER_TEMPLATE =
   "Hola {nombre}, te recuerdo tu cita en Skadi Lashes mañana, {fecha}, a las {hora}.\n\n" +
   "Servicios: {servicios}.\n\n" +
-  `${ruleText("Puntualidad")}\n` +
-  `${ruleText("Acompañantes")}\n\n` +
+  "{normas}\n\n" +
   "Si necesitas cambiarla o no puedes venir, hazlo desde aquí: {enlace}";
 
 export const DEFAULT_RETOUCH_TEMPLATE =
@@ -51,6 +53,7 @@ export const PLACEHOLDERS: { key: string; label: string; example: string }[] = [
   { key: "hora", label: "Hora", example: "12:00 pm" },
   { key: "servicios", label: "Servicios", example: "Pestañas clásicas, Retiro" },
   { key: "enlace", label: "Enlace", example: "https://skadi.example/cita/abc123" },
+  { key: "normas", label: "Normas", example: DEFAULT_NORMS },
 ];
 
 // Cambia cada {marcador} conocido por su valor. Lo que no se conoce queda
@@ -71,6 +74,7 @@ function valuesFor(a: MessageAppointment): Record<string, string> {
     hora: formatTime12(a.time),
     servicios: a.services.join(", "),
     enlace: a.link,
+    normas: a.norms ?? DEFAULT_NORMS,
   };
 }
 
