@@ -298,7 +298,7 @@ export function BookingFlow({
       {step === "datetime" && (
         <>
           <CalendarStep
-            serviceIds={chosen.map((s) => s.id)}
+            query={`services=${chosen.map((s) => s.id).join(",")}`}
             today={today}
             lastBookableDate={lastBookableDate}
             month={month}

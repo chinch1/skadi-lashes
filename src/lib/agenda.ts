@@ -52,6 +52,10 @@ export type AgendaData = {
   toConfirm: AgendaAppointment[];
   toNotifyRejection: AgendaAppointment[];
   dayAppointments: AgendaAppointment[];
+  // Horas de aviso: liberar con menos tiempo hace perder el abono.
+  noticeHours: number;
+  // Textos de WhatsApp de Giselle; null = el de la app.
+  messageTemplates: { confirmation: string | null; rejection: string | null };
 };
 
 const RECEIPT_BUCKET = "receipts";
@@ -241,7 +245,7 @@ export async function getAgenda(
 ): Promise<AgendaData> {
   const { data: studio, error: studioError } = await supabase
     .from("studios")
-    .select("timezone")
+    .select("timezone, reschedule_notice_hours, confirmation_message, rejection_message")
     .eq("id", studioId)
     .maybeSingle();
   if (studioError) fail("estudio", studioError.message);
@@ -275,13 +279,13 @@ export async function getAgenda(
       .is("confirmation_sent_at", null)
       .gt("starts_at", nowIso)
       .order("starts_at", { ascending: true }),
-    // Citas esperando un comprobante nuevo (candidatas a aviso de rechazo).
+    // Citas liberadas que aún no pasan (candidatas a aviso de rechazo).
     supabase
       .from("appointments")
       .select(APPOINTMENT_SELECT)
       .eq("studio_id", studioId)
-      .eq("status", "pending_deposit")
-      .or(`hold_expires_at.is.null,hold_expires_at.gt.${nowIso}`)
+      .eq("status", "released")
+      .gt("starts_at", nowIso)
       .order("starts_at", { ascending: true }),
     // Citas del día mostrado.
     supabase
@@ -310,7 +314,8 @@ export async function getAgenda(
   const pendingDeposits: PendingDeposit[] = [];
   for (const d of pendingRows) {
     const appointment = one(d.appointments);
-    if (!appointment) continue;
+    // Solo los de citas que siguen esperando el abono (no las liberadas).
+    if (!appointment || appointment.status !== "pending_deposit") continue;
     pendingDeposits.push({
       depositId: d.id,
       createdAt: d.created_at,
@@ -328,9 +333,9 @@ export async function getAgenda(
     .filter((a) => a.deposits.some((d) => d.status === "approved"))
     .map((a) => a.view);
 
-  // Por avisar del rechazo: esperando comprobante y el último abono fue rechazado.
+  // Por avisar del rechazo: cita liberada cuyo último abono fue rechazado.
+  // Incluye las que Giselle liberó con un comprobante sin revisar.
   const rejected = load(rejectedRes.data).filter((a) => {
-    if (!a.view.awaitingReceipt) return false;
     const latest = latestDeposit(a.deposits);
     return latest?.status === "rejected";
   });
@@ -375,5 +380,10 @@ export async function getAgenda(
     toConfirm,
     toNotifyRejection,
     dayAppointments,
+    noticeHours: Number(studio.reschedule_notice_hours ?? 12) || 0,
+    messageTemplates: {
+      confirmation: studio.confirmation_message ?? null,
+      rejection: studio.rejection_message ?? null,
+    },
   };
 }

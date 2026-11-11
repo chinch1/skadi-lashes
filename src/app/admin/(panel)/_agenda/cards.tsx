@@ -138,12 +138,27 @@ function StatusChip({ appointment: a }: { appointment: AgendaAppointment }) {
   );
 }
 
+// Lo que se pregunta antes de liberar. A una clienta sin abono no se le
+// menciona el abono.
+function releaseQuestion(a: AgendaAppointment, late: boolean, noticeHours: number): string {
+  if (a.depositCents === 0) return "¿Liberar este horario?";
+  if (late) {
+    return `¿Liberar este horario? Faltan menos de ${noticeHours} horas: la clienta pierde el abono.`;
+  }
+  return "¿Liberar este horario? Avísale a la clienta.";
+}
+
 export function AppointmentCard({
   appointment: a,
   started,
+  lateRelease,
+  noticeHours,
 }: {
   appointment: AgendaAppointment;
   started: boolean;
+  // Faltan menos horas que las de aviso (hora del servidor).
+  lateRelease: boolean;
+  noticeHours: number;
 }) {
   const active = a.status === "pending_deposit" || a.status === "confirmed";
   return (
@@ -173,6 +188,7 @@ export function AppointmentCard({
           <AppointmentActions
             appointmentId={a.id}
             canRelease={active}
+            releaseConfirm={releaseQuestion(a, lateRelease, noticeHours)}
             canMark={a.status === "confirmed" && started}
           />
         </div>

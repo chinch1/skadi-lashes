@@ -31,7 +31,7 @@ function shiftMonth(month: string, delta: number): string {
 type Result = { key: string; days: Record<string, string[]> } | { key: string; error: string };
 
 export function CalendarStep({
-  serviceIds,
+  query,
   today,
   lastBookableDate,
   month,
@@ -42,7 +42,8 @@ export function CalendarStep({
   onSelectTime,
   notice,
 }: {
-  serviceIds: string[];
+  // Qué se consulta: "services=<id>,<id>" al agendar o "cita=<token>" al reprogramar.
+  query: string;
   today: string;
   lastBookableDate: string;
   month: string;
@@ -53,7 +54,7 @@ export function CalendarStep({
   onSelectTime: (time: string) => void;
   notice: string | null;
 }) {
-  const servicesParam = serviceIds.join(",");
+  const servicesParam = query;
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
   const timesRef = useRef<HTMLDivElement>(null);
@@ -65,7 +66,8 @@ export function CalendarStep({
   useEffect(() => {
     const requestKey = `${month}|${servicesParam}|${attempt}`;
     const controller = new AbortController();
-    const params = new URLSearchParams({ month, services: servicesParam });
+    const params = new URLSearchParams(servicesParam);
+    params.set("month", month);
     fetch(`/api/availability?${params}`, {
       signal: controller.signal,
       cache: "no-store",

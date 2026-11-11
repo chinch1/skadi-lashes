@@ -34,13 +34,13 @@ function parseDate(value: string | string[] | undefined): string | undefined {
   return addDays(value, 0) === value ? value : undefined;
 }
 
-function messageData(a: AgendaAppointment, origin: string) {
+function messageData(a: AgendaAppointment, link: string) {
   return {
     firstName: a.client.firstName,
     date: a.date,
     time: a.time,
     services: a.services.map((service) => service.name),
-    link: `${origin}/cita/${a.token}`,
+    link,
   };
 }
 
@@ -61,8 +61,11 @@ export default async function Page(props: PageProps<"/admin">) {
     getStudioRates(),
     siteOrigin(),
   ]);
-  // Hora del servidor: decide si ya se puede marcar "Asistió" o "No asistió".
+  // Hora del servidor: decide si ya se puede marcar "Asistió" o "No asistió",
+  // y si liberar ahora hace perder el abono.
   const now = serverNow();
+  const noticeMs = agenda.noticeHours * 3_600_000;
+  const templates = agenda.messageTemplates;
   const { today, date } = agenda;
   const isToday = date === today;
   const toNotify = agenda.toConfirm.length + agenda.toNotifyRejection.length;
@@ -112,7 +115,10 @@ export default async function Page(props: PageProps<"/admin">) {
                 kind="confirmation"
                 href={waLink(
                   a.client.phone,
-                  confirmationMessage(messageData(a, origin)),
+                  confirmationMessage(
+                    messageData(a, `${origin}/cita/${a.token}`),
+                    templates.confirmation,
+                  ),
                 )}
               />
             ))}
@@ -123,10 +129,11 @@ export default async function Page(props: PageProps<"/admin">) {
                 kind="rejection"
                 href={waLink(
                   a.client.phone,
-                  rejectionMessage({
-                    ...messageData(a, origin),
-                    deadline: a.holdDeadline,
-                  }),
+                  // El horario ya quedó libre: se envía el enlace para agendar.
+                  rejectionMessage(
+                    messageData(a, `${origin}/agendar`),
+                    templates.rejection,
+                  ),
                 )}
               />
             ))}
@@ -183,6 +190,8 @@ export default async function Page(props: PageProps<"/admin">) {
                 key={a.id}
                 appointment={a}
                 started={new Date(a.startsAt).getTime() <= now}
+                lateRelease={new Date(a.startsAt).getTime() - now < noticeMs}
+                noticeHours={agenda.noticeHours}
               />
             ))}
           </ul>

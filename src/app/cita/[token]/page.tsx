@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
-import { primaryButton } from "@/components/ui";
+import { primaryButton, secondaryButton } from "@/components/ui";
 import { getBookingView, type BookingView } from "@/lib/booking";
 import { formatLongDate, formatTime12 } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
@@ -121,6 +121,18 @@ function Header({ title, children }: { title: string; children?: ReactNode }) {
   );
 }
 
+// Enlace discreto a la pantalla que ofrece liberar el horario.
+function CantComeLink({ token }: { token: string }) {
+  return (
+    <Link
+      href={`/cita/${token}/reprogramar`}
+      className="flex min-h-11 items-center justify-center text-muted underline"
+    >
+      No podré asistir
+    </Link>
+  );
+}
+
 // Encabezado (título y texto) y cuerpo (normas, formulario, enlaces) de cada estado.
 // El resumen de la cita va entre los dos.
 function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode } {
@@ -162,6 +174,7 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
                 Por ahora no se puede pagar en línea. Escríbele a Skadi Lashes.
               </p>
             )}
+            <CantComeLink token={view.token} />
           </>
         ),
       };
@@ -176,6 +189,7 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
             </p>
           </Header>
         ),
+        body: <CantComeLink token={view.token} />,
       };
     case "confirmed":
       // También la ve la clienta sin abono: aquí no se habla de pagos.
@@ -185,7 +199,14 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
             <p className="text-muted">Te esperamos, {view.clientFirstName}.</p>
           </Header>
         ),
-        body: <RuleList titles={["Puntualidad", "Acompañantes"]} />,
+        body: (
+          <>
+            <RuleList titles={["Puntualidad", "Acompañantes"]} />
+            <Link href={`/cita/${view.token}/reprogramar`} className={secondaryButton}>
+              Reprogramar o avisar que no puedo ir
+            </Link>
+          </>
+        ),
       };
     case "expired":
       return {
@@ -221,13 +242,25 @@ function stateContent(view: BookingView): { header: ReactNode; body?: ReactNode 
 
 export default async function Page(props: PageProps<"/cita/[token]">) {
   const { token } = await props.params;
+  const { cambio } = await props.searchParams;
   const view = await getBookingView(token);
   if (!view) notFound();
 
   const { header, body } = stateContent(view);
+  // Viene de reprogramar sin abono nuevo: se confirma el cambio arriba.
+  const changed = cambio === "ok" && view.state === "confirmed";
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-10">
+      {changed && (
+        <p
+          role="status"
+          className="rounded-xl border border-border-strong bg-tint px-4 py-3"
+        >
+          Listo, tu cita quedó para el {formatLongDate(view.date)} a las{" "}
+          {formatTime12(view.time)}.
+        </p>
+      )}
       {header}
       <Summary view={view} />
       {body}
