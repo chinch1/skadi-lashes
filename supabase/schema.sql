@@ -142,6 +142,8 @@ create table appointments (
   deposit_cents         integer not null check (deposit_cents >= 0),     -- copia del abono al reservar
   total_cents           integer not null check (total_cents >= 0),       -- copia del total al reservar
   hold_expires_at       timestamptz,                                     -- hasta cuándo se guarda el horario sin aprobar
+  quote_eur_to_ves      numeric(14, 4),                                  -- tasa congelada al llegar al paso de pago
+  quote_eur_to_usdt     numeric(14, 6),                                  -- tasa congelada al llegar al paso de pago
   confirmation_sent_at  timestamptz,
   created_at            timestamptz not null default now(),
   check (ends_at > starts_at),
