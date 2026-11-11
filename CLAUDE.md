@@ -178,3 +178,4 @@ Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. 
 9. Recordatorios.
 10. Tareas diarias: tasas y borrado de comprobantes.
 11. Configuración de app instalable.
+12. Sección de ganancias por mes en dólares, en el panel de Giselle (pedido por Nico el 11 nov 2026, para el final). Por definir qué cuenta como ganancia: citas atendidas, abonos perdidos, cargos por retraso.
