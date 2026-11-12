@@ -10,6 +10,7 @@ import { getRuleSettings } from "@/lib/studio-settings";
 import { addDays } from "@/lib/time";
 import {
   confirmationMessage,
+  reminderMessage,
   normsText,
   rejectionMessage,
   waLink,
@@ -107,6 +108,21 @@ export default async function Page(props: PageProps<"/admin">) {
   const tomorrow = addDays(today, 1);
   const upcomingCount = `${agenda.upcoming.length}${agenda.upcomingTruncated ? "+" : ""}`;
 
+  // Recordatorio para una cita confirmada que aún no empieza, si la clienta
+  // aceptó recordatorios. Usa el texto que Giselle configura en Ajustes.
+  const reminderHref = (a: AgendaAppointment) =>
+    a.status === "confirmed" &&
+    a.client.remindersOk &&
+    new Date(a.startsAt).getTime() > now
+      ? waLink(
+          a.client.phone,
+          reminderMessage(
+            { ...messageData(a, `${origin}/cita/${a.token}`, norms), today },
+            studio.reminder_message,
+          ),
+        )
+      : null;
+
   const renderCard = (a: AgendaAppointment) => (
     <AppointmentCard
       key={a.id}
@@ -114,6 +130,7 @@ export default async function Page(props: PageProps<"/admin">) {
       started={new Date(a.startsAt).getTime() <= now}
       lateRelease={new Date(a.startsAt).getTime() - now < noticeMs}
       noticeHours={agenda.noticeHours}
+      reminderHref={reminderHref(a)}
     />
   );
 

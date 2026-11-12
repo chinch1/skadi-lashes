@@ -77,8 +77,8 @@ export default async function Page() {
           />
           <MessageForm
             kind="reminder"
-            title="Recordatorio de la cita de mañana"
-            description="Se envía el día antes. El enlace lleva a la página de su cita."
+            title="Recordatorio de cita"
+            description="Para recordarle una cita confirmada, desde Recordatorios o desde el botón de la cita en la Agenda. {dia} dice hoy, mañana o la fecha, según cuándo sea. El enlace lleva a la página de su cita."
             initialText={studio.reminder_message || DEFAULT_REMINDER_TEMPLATE}
             defaultText={DEFAULT_REMINDER_TEMPLATE}
             previewLink={`${origin}/cita/abc123`}

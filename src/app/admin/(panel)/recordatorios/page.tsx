@@ -114,6 +114,7 @@ export default async function Page() {
                             services: a.services,
                             link: `${origin}/cita/${a.token}`,
                             norms,
+                            today: data.today,
                           },
                           templates.reminder,
                         ),
