@@ -246,4 +246,10 @@ describe("retouchMessage", () => {
   it("el texto por defecto lleva el enlace", () => {
     expect(DEFAULT_RETOUCH_TEMPLATE).toContain("{enlace}");
   });
+
+  it("sin mensaje, el enlace abre solo el chat", () => {
+    expect(waLink("+584121234567", "")).toBe("https://wa.me/584121234567");
+    expect(waLink("+584121234567", "   ")).toBe("https://wa.me/584121234567");
+    expect(waLink("+584121234567", "Hola")).toBe("https://wa.me/584121234567?text=Hola");
+  });
 });
