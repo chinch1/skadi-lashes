@@ -25,7 +25,7 @@ export type AgendaAppointment = {
   status: AgendaStatus;
   // pending_deposit sin pago (abono 0): espera que Giselle la confirme o la rechace.
   awaitingConfirmation: boolean;
-  client: { id: string; firstName: string; lastName: string; phone: string };
+  client: { id: string; firstName: string; lastName: string; phone: string; remindersOk: boolean };
   services: { name: string; durationMin: number; priceCents: number }[];
   totalCents: number;
   durationMin: number;
@@ -112,7 +112,7 @@ function many<T>(value: T | T[] | null | undefined): T[] {
 
 const APPOINTMENT_SELECT = `id, manage_token, status, starts_at, ends_at, deposit_cents,
   total_cents, hold_expires_at, confirmation_sent_at, rejected_at,
-  clients ( id, first_name, last_name, phone ),
+  clients ( id, first_name, last_name, phone, reminders_ok ),
   appointment_services ( name, duration_min, price_cents ),
   deposits ( id, status, created_at, reviewed_at )`;
 
@@ -135,8 +135,8 @@ type RawAppointment = {
   confirmation_sent_at: string | null;
   rejected_at: string | null;
   clients:
-    | { id: string; first_name: string; last_name: string; phone: string }
-    | { id: string; first_name: string; last_name: string; phone: string }[]
+    | { id: string; first_name: string; last_name: string; phone: string; reminders_ok: boolean }
+    | { id: string; first_name: string; last_name: string; phone: string; reminders_ok: boolean }[]
     | null;
   appointment_services: { name: string; duration_min: number; price_cents: number }[] | null;
   deposits: RawDepositSummary[] | null;
@@ -195,6 +195,7 @@ function toLoaded(row: RawAppointment, timeZone: string): Loaded {
         firstName: client?.first_name ?? "",
         lastName: client?.last_name ?? "",
         phone: client?.phone ?? "",
+        remindersOk: client?.reminders_ok === true,
       },
       services,
       totalCents: Number(row.total_cents) || 0,

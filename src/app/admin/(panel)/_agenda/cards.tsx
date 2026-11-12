@@ -6,6 +6,7 @@ import { formatEuros } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { formatDuration } from "@/lib/services";
 import { waLink } from "@/lib/whatsapp";
+import { ReminderButton } from "./reminder-button";
 import { AppointmentActions } from "./appointment-actions";
 import { ConfirmationActions } from "./confirmation-actions";
 import { DepositActions } from "./deposit-actions";
@@ -206,12 +207,16 @@ export function AppointmentCard({
   started,
   lateRelease,
   noticeHours,
+  reminderHref,
 }: {
   appointment: AgendaAppointment;
   started: boolean;
   // Faltan menos horas que las de aviso (hora del servidor).
   lateRelease: boolean;
   noticeHours: number;
+  // Enlace de WhatsApp con el recordatorio ya escrito. Solo para citas
+  // confirmadas de clientas que aceptaron recordatorios.
+  reminderHref?: string | null;
 }) {
   const active = a.status === "pending_deposit" || a.status === "confirmed";
   return (
@@ -223,7 +228,17 @@ export function AppointmentCard({
       <div className="mt-1">
         <AppointmentActions
           appointmentId={a.id}
-          whatsapp={<WhatsAppButton appointment={a} />}
+          whatsapp={
+            reminderHref ? (
+              <ReminderButton
+                appointmentId={a.id}
+                href={reminderHref}
+                clientName={fullName(a)}
+              />
+            ) : (
+              <WhatsAppButton appointment={a} />
+            )
+          }
           canRelease={active}
           releaseConfirm={releaseQuestion(a, lateRelease, noticeHours)}
           canMark={a.status === "confirmed" && started}
