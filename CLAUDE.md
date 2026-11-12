@@ -92,7 +92,8 @@ Rutas de servicio: `GET /api/availability`, `POST /api/tasks/rates`, `POST /api/
 ### Horario
 
 - Giselle marca a mano, día por día, las horas de inicio que ofrece. Arma el mes completo con antelación y suele trabajar también los fines de semana.
-- Solo se ofrecen esas horas, y solo si la cita completa no pisa otra cita. Una cita larga ocupa las horas siguientes que pise.
+- Solo se ofrecen esas horas. Una hora se ofrece si la cita completa termina antes de la siguiente hora marcada de ese día y no pisa otra cita; la última hora del día no tiene límite. Ejemplo: con horas a las 9:00, 12:00 y 3:30, una cita de 3 h 30 min se ofrece a las 12:00 y a las 3:30, pero no a las 9:00 (decidido por Nico el 12 nov 2026).
+- Consecuencia: la separación entre horas marcadas limita qué servicios caben. Con horas cada 2 h 30 min, un servicio de 3 horas solo cabe en la última.
 - Las horas viven en `day_slots`. `working_hours` y `time_blocks` son del modelo anterior y están en desuso.
 - La rejilla de "Mi horario" va de 6:00 am a 9:00 pm cada 30 minutos.
 - La clienta puede agendar hasta `booking_window_weeks` semanas adelante (8) y con 60 minutos de anticipación mínima.
