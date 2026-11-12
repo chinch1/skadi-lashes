@@ -67,8 +67,25 @@ function dayHref(date: string, today: string): string {
   return date === today ? "/admin" : `/admin?fecha=${date}`;
 }
 
+type View = "dia" | "proximas";
+
+const segment =
+  "flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-medium";
+
+// Agrupa las citas (ya ordenadas) por día.
+function groupByDay(list: AgendaAppointment[]): { date: string; items: AgendaAppointment[] }[] {
+  const groups: { date: string; items: AgendaAppointment[] }[] = [];
+  for (const a of list) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === a.date) last.items.push(a);
+    else groups.push({ date: a.date, items: [a] });
+  }
+  return groups;
+}
+
 export default async function Page(props: PageProps<"/admin">) {
-  const { fecha } = await props.searchParams;
+  const { fecha, vista } = await props.searchParams;
+  const view: View = vista === "proximas" ? "proximas" : "dia";
   const { supabase, studioId, studio } = await requireAdminPage();
 
   const [agenda, rates, origin, ruleSettings] = await Promise.all([
@@ -87,6 +104,18 @@ export default async function Page(props: PageProps<"/admin">) {
   const { today, date } = agenda;
   const isToday = date === today;
   const toNotify = agenda.toConfirm.length + agenda.toNotifyRejection.length;
+  const tomorrow = addDays(today, 1);
+  const upcomingCount = `${agenda.upcoming.length}${agenda.upcomingTruncated ? "+" : ""}`;
+
+  const renderCard = (a: AgendaAppointment) => (
+    <AppointmentCard
+      key={a.id}
+      appointment={a}
+      started={new Date(a.startsAt).getTime() <= now}
+      lateRelease={new Date(a.startsAt).getTime() - now < noticeMs}
+      noticeHours={agenda.noticeHours}
+    />
+  );
 
   return (
     <>
@@ -185,58 +214,113 @@ export default async function Page(props: PageProps<"/admin">) {
 
       <section aria-labelledby="citas" className="mt-8">
         <h2 id="citas" className="text-xl font-semibold">
-          Citas del día
+          {view === "dia" ? "Citas del día" : "Próximas citas"}
         </h2>
 
         <nav
-          aria-label="Cambiar de día"
-          className="mt-3 flex items-center gap-1 rounded-2xl border border-border bg-white p-1"
+          aria-label="Ver citas"
+          className="mt-3 grid grid-cols-2 gap-1 rounded-2xl border border-border bg-tint p-1"
         >
-          <Link
-            href={dayHref(addDays(date, -1), today)}
-            prefetch={false}
-            aria-label="Día anterior"
-            className={`${smallButton} min-w-11 text-xl`}
-          >
-            ‹
-          </Link>
-          <p className="min-w-0 flex-1 text-center font-medium first-letter:uppercase">
-            {formatLongDate(date)}
-            {isToday && <span className="text-muted"> · Hoy</span>}
-          </p>
-          <Link
-            href={dayHref(addDays(date, 1), today)}
-            prefetch={false}
-            aria-label="Día siguiente"
-            className={`${smallButton} min-w-11 text-xl`}
-          >
-            ›
-          </Link>
-        </nav>
-        {!isToday && (
           <Link
             href="/admin"
             prefetch={false}
-            className={`${smallButton} mx-auto mt-1 w-fit`}
+            aria-current={view === "dia" ? "page" : undefined}
+            className={`${segment} ${view === "dia" ? "bg-white text-foreground shadow-sm" : "text-primary"}`}
           >
-            Volver a hoy
+            Día
           </Link>
-        )}
+          <Link
+            href="/admin?vista=proximas"
+            prefetch={false}
+            aria-current={view === "proximas" ? "page" : undefined}
+            className={`${segment} ${view === "proximas" ? "bg-white text-foreground shadow-sm" : "text-primary"}`}
+          >
+            Próximas ({upcomingCount})
+          </Link>
+        </nav>
 
-        {agenda.dayAppointments.length === 0 ? (
-          <p className="mt-4 text-muted">No hay citas este día.</p>
+        {view === "dia" ? (
+          <>
+            <nav
+              aria-label="Cambiar de día"
+              className="mt-3 flex items-center gap-1 rounded-2xl border border-border bg-white p-1"
+            >
+              <Link
+                href={dayHref(addDays(date, -1), today)}
+                prefetch={false}
+                aria-label="Día anterior"
+                className={`${smallButton} min-w-11 text-xl`}
+              >
+                ‹
+              </Link>
+              <p className="min-w-0 flex-1 text-center font-medium first-letter:uppercase">
+                {formatLongDate(date)}
+                {isToday && <span className="text-muted"> · Hoy</span>}
+              </p>
+              <Link
+                href={dayHref(addDays(date, 1), today)}
+                prefetch={false}
+                aria-label="Día siguiente"
+                className={`${smallButton} min-w-11 text-xl`}
+              >
+                ›
+              </Link>
+            </nav>
+            {!isToday && (
+              <Link
+                href="/admin"
+                prefetch={false}
+                className={`${smallButton} mx-auto mt-1 w-fit`}
+              >
+                Volver a hoy
+              </Link>
+            )}
+
+            {agenda.dayAppointments.length === 0 ? (
+              <div className="mt-4">
+                <p className="text-muted">No hay citas este día.</p>
+                <Link
+                  href="/admin?vista=proximas"
+                  prefetch={false}
+                  className={`${smallButton} -ml-3 w-fit`}
+                >
+                  Ver próximas citas
+                </Link>
+              </div>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-3">
+                {agenda.dayAppointments.map(renderCard)}
+              </ul>
+            )}
+          </>
+        ) : agenda.upcoming.length === 0 ? (
+          <p className="mt-4 text-muted">No hay citas próximas.</p>
         ) : (
-          <ul className="mt-3 flex flex-col gap-3">
-            {agenda.dayAppointments.map((a) => (
-              <AppointmentCard
-                key={a.id}
-                appointment={a}
-                started={new Date(a.startsAt).getTime() <= now}
-                lateRelease={new Date(a.startsAt).getTime() - now < noticeMs}
-                noticeHours={agenda.noticeHours}
-              />
+          <>
+            {groupByDay(agenda.upcoming).map((group) => (
+              <section
+                key={group.date}
+                aria-label={formatLongDate(group.date)}
+                className="mt-5"
+              >
+                <h3 className="font-medium first-letter:uppercase">
+                  {formatLongDate(group.date)}
+                  {group.date === today && <span className="text-muted"> · Hoy</span>}
+                  {group.date === tomorrow && (
+                    <span className="text-muted"> · Mañana</span>
+                  )}
+                </h3>
+                <ul className="mt-2 flex flex-col gap-3">
+                  {group.items.map(renderCard)}
+                </ul>
+              </section>
             ))}
-          </ul>
+            {agenda.upcomingTruncated && (
+              <p className="mt-4 text-sm text-muted">
+                Mostrando las próximas {agenda.upcoming.length} citas.
+              </p>
+            )}
+          </>
         )}
       </section>
 

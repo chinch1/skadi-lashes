@@ -181,7 +181,7 @@ Aparecen en el inicio. No se repiten en el paso de pago.
 
 ### Giselle (`/admin`)
 
-- Agenda: abonos por aprobar, citas por confirmar, avisos por WhatsApp, citas del día con navegación, copiar enlace de reservas, tasa del día.
+- Agenda: abonos por aprobar, citas por confirmar, avisos por WhatsApp, citas en dos vistas ("Día", con navegación, y "Próximas", todas las futuras agrupadas por día), copiar enlace de reservas, tasa del día. Cada cita tiene a la derecha un botón de WhatsApp y "Liberar". Las reservas que aún esperan el pago no aparecen: solo viven los minutos del reloj.
 - Recordatorios: citas de mañana y retoques pendientes.
 - Clientas: buscador, ficha con historial, casilla "Pide abono", nombre editable.
 - Servicios: secciones y servicios, orden por arrastre, visibilidad, formulario con foto.
