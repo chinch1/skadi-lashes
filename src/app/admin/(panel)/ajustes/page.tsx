@@ -44,8 +44,22 @@ export default async function Page() {
       </p>
 
       <Link
-        href="/admin/ajustes/horario"
+        href="/admin/ajustes/ganancias"
         className="mt-6 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Ganancias</span>
+          <span className="block text-sm text-muted">
+            Lo que ganaste cada mes, en dólares.
+          </span>
+        </span>
+        <span aria-hidden="true" className="text-xl text-muted">
+          ›
+        </span>
+      </Link>
+      <Link
+        href="/admin/ajustes/horario"
+        className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3"
       >
         <span className="min-w-0 flex-1">
           <span className="block font-semibold">Mi horario</span>
