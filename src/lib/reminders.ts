@@ -117,14 +117,24 @@ type RawRetouch = {
 export async function getReminders(
   supabase: SupabaseClient,
   studioId: string,
+  // Fila del estudio ya cargada (viene con la comprobación de administradora).
+  preloadedStudio?: {
+    timezone: string;
+    reminder_message?: string | null;
+    retouch_message?: string | null;
+  },
 ): Promise<RemindersData> {
-  const { data: studio, error: studioError } = await supabase
-    .from("studios")
-    .select("timezone, reminder_message, retouch_message")
-    .eq("id", studioId)
-    .maybeSingle();
-  if (studioError) fail("estudio", studioError.message);
-  if (!studio) fail("estudio", "No se encontró el estudio.");
+  let studio = preloadedStudio;
+  if (!studio) {
+    const { data, error: studioError } = await supabase
+      .from("studios")
+      .select("timezone, reminder_message, retouch_message")
+      .eq("id", studioId)
+      .maybeSingle();
+    if (studioError) fail("estudio", studioError.message);
+    if (!data) fail("estudio", "No se encontró el estudio.");
+    studio = data;
+  }
 
   const timeZone: string = studio.timezone;
   const now = new Date();

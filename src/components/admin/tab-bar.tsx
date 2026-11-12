@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 const TABS = [
@@ -30,6 +30,18 @@ const TABS = [
     icon: "M4 7h9M17 7h3M4 17h3M11 17h9M15 4.5v5M9 14.5v5",
   },
 ] as const;
+
+// La pestaña tocada responde al instante, aunque la pantalla tarde en llegar.
+function TabLabel({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      className={`max-w-full truncate ${pending ? "animate-pulse font-semibold text-primary" : ""}`}
+    >
+      {label}
+    </span>
+  );
+}
 
 export function TabBar() {
   const pathname = usePathname();
@@ -66,7 +78,7 @@ export function TabBar() {
                 >
                   <path d={tab.icon} />
                 </svg>
-                <span className="max-w-full truncate">{tab.label}</span>
+                <TabLabel label={tab.label} />
               </Link>
             </li>
           );

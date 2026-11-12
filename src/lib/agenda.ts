@@ -238,18 +238,31 @@ async function signReceipts(
 // Agenda
 // ---------------------------------------------------------------------
 
+type StudioFields = {
+  timezone: string;
+  reschedule_notice_hours?: number | null;
+  confirmation_message?: string | null;
+  rejection_message?: string | null;
+};
+
 export async function getAgenda(
   supabase: SupabaseClient,
   studioId: string,
   date?: string,
+  // Fila del estudio ya cargada (viene con la comprobación de administradora).
+  preloadedStudio?: StudioFields,
 ): Promise<AgendaData> {
-  const { data: studio, error: studioError } = await supabase
-    .from("studios")
-    .select("timezone, reschedule_notice_hours, confirmation_message, rejection_message")
-    .eq("id", studioId)
-    .maybeSingle();
-  if (studioError) fail("estudio", studioError.message);
-  if (!studio) fail("estudio", "No se encontró el estudio.");
+  let studio = preloadedStudio;
+  if (!studio) {
+    const { data, error: studioError } = await supabase
+      .from("studios")
+      .select("timezone, reschedule_notice_hours, confirmation_message, rejection_message")
+      .eq("id", studioId)
+      .maybeSingle();
+    if (studioError) fail("estudio", studioError.message);
+    if (!data) fail("estudio", "No se encontró el estudio.");
+    studio = data as StudioFields;
+  }
 
   const timeZone: string = studio.timezone;
   const now = new Date();

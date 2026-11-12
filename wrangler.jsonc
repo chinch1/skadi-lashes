@@ -16,5 +16,8 @@
   ],
   // Tareas diarias (tasas y limpieza): 6:00 am y 6:00 pm, hora de Caracas (la segunda es un reintento).
   "triggers": { "crons": ["0 10 * * *", "0 22 * * *"] },
+  // Ejecuta la app cerca de la base de datos en vez de cerca de quien la usa:
+  // cada pantalla hace varias consultas a Supabase y así cada una viaja menos.
+  "placement": { "mode": "smart" },
   "observability": { "enabled": true }
 }
