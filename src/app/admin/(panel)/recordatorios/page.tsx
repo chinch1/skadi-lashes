@@ -68,9 +68,9 @@ function RetouchCard({ item, href }: { item: RetouchReminder; href: string }) {
 }
 
 export default async function Page() {
-  const { supabase, studioId } = await requireAdminPage();
+  const { supabase, studioId, studio } = await requireAdminPage();
   const [data, origin, ruleSettings] = await Promise.all([
-    getReminders(supabase, studioId),
+    getReminders(supabase, studioId, studio),
     siteOrigin(),
     getRuleSettings(),
   ]);

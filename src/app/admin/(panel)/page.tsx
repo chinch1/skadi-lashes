@@ -58,10 +58,10 @@ function dayHref(date: string, today: string): string {
 
 export default async function Page(props: PageProps<"/admin">) {
   const { fecha } = await props.searchParams;
-  const { supabase, studioId } = await requireAdminPage();
+  const { supabase, studioId, studio } = await requireAdminPage();
 
   const [agenda, rates, origin, ruleSettings] = await Promise.all([
-    getAgenda(supabase, studioId, parseDate(fecha)),
+    getAgenda(supabase, studioId, parseDate(fecha), studio),
     getStudioRates(),
     siteOrigin(),
     getRuleSettings(),
