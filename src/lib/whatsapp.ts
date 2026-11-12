@@ -1,4 +1,5 @@
 import { formatLongDate, formatTime12 } from "./format";
+import { addDays } from "./time";
 import { RULES, ruleText, type Rule } from "./rules";
 
 // Mensajes de WhatsApp que Giselle envía con un enlace wa.me.
@@ -15,6 +16,8 @@ export type MessageAppointment = {
   // Normas para {normas}, armadas con los ajustes actuales (normsText).
   // Sin este campo se usan las de la app.
   norms?: string;
+  // Fecha de hoy en el estudio ("AAAA-MM-DD"). Sirve para que {dia} diga "hoy" o "mañana".
+  today?: string;
 };
 
 // Largo máximo de un texto guardado por Giselle.
@@ -38,7 +41,7 @@ export const DEFAULT_REJECTION_TEMPLATE =
   "Si quieres, puedes agendar de nuevo aquí: {enlace}";
 
 export const DEFAULT_REMINDER_TEMPLATE =
-  "Hola {nombre}, te recuerdo tu cita en Skadi Lashes mañana, {fecha}, a las {hora}.\n\n" +
+  "Hola {nombre}, te recuerdo tu cita en Skadi Lashes {dia} a las {hora}.\n\n" +
   "Servicios: {servicios}.\n\n" +
   "{normas}\n\n" +
   "Si necesitas cambiarla o no puedes venir, hazlo desde aquí: {enlace}";
@@ -50,6 +53,7 @@ export const DEFAULT_RETOUCH_TEMPLATE =
 export const PLACEHOLDERS: { key: string; label: string; example: string }[] = [
   { key: "nombre", label: "Nombre", example: "María" },
   { key: "fecha", label: "Fecha", example: "jueves 12 de noviembre" },
+  { key: "dia", label: "Día", example: "mañana, jueves 12 de noviembre" },
   { key: "hora", label: "Hora", example: "12:00 pm" },
   { key: "servicios", label: "Servicios", example: "Pestañas clásicas, Retiro" },
   { key: "enlace", label: "Enlace", example: "https://skadi.example/cita/abc123" },
@@ -67,10 +71,19 @@ export function renderTemplate(
   );
 }
 
+// {dia}: la fecha dicha como se habla. "hoy, …", "mañana, …" o "el …".
+function spokenDay(date: string, today?: string): string {
+  const long = formatLongDate(date);
+  if (today && date === today) return `hoy, ${long}`;
+  if (today && date === addDays(today, 1)) return `mañana, ${long}`;
+  return `el ${long}`;
+}
+
 function valuesFor(a: MessageAppointment): Record<string, string> {
   return {
     nombre: a.firstName,
     fecha: formatLongDate(a.date),
+    dia: spokenDay(a.date, a.today),
     hora: formatTime12(a.time),
     servicios: a.services.join(", "),
     enlace: a.link,
@@ -98,7 +111,7 @@ export function rejectionMessage(
   return renderTemplate(pick(template, DEFAULT_REJECTION_TEMPLATE), valuesFor(a));
 }
 
-// Recordatorio de la cita de mañana. `link` es la página de su cita.
+// Recordatorio de una cita confirmada (mañana, hoy o más adelante). `link` es la página de su cita.
 export function reminderMessage(
   a: MessageAppointment,
   template?: string | null,

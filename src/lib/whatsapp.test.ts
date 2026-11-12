@@ -65,10 +65,11 @@ describe("renderTemplate", () => {
 });
 
 describe("PLACEHOLDERS", () => {
-  it("ofrece los seis marcadores", () => {
+  it("ofrece los siete marcadores", () => {
     expect(PLACEHOLDERS.map((p) => p.key)).toEqual([
       "nombre",
       "fecha",
+      "dia",
       "hora",
       "servicios",
       "enlace",
@@ -176,14 +177,22 @@ describe("rejectionMessage", () => {
 
 describe("reminderMessage", () => {
   const expected =
-    "Hola María, te recuerdo tu cita en Skadi Lashes mañana, jueves 12 de noviembre, a las 12:00 pm.\n\n" +
+    "Hola María, te recuerdo tu cita en Skadi Lashes mañana, jueves 12 de noviembre a las 12:00 pm.\n\n" +
     "Servicios: Pestañas clásicas, Retiro.\n\n" +
     `${rule("Puntualidad")}\n` +
     `${rule("Acompañantes")}\n\n` +
     "Si necesitas cambiarla o no puedes venir, hazlo desde aquí: https://skadi.example/cita/abc";
 
   it("con el texto por defecto arma fecha, hora, servicios, normas y el enlace de su cita", () => {
-    expect(reminderMessage(appointment)).toBe(expected);
+    expect(reminderMessage({ ...appointment, today: "2026-11-11" })).toBe(expected);
+  });
+
+  it("{dia} dice hoy, mañana o la fecha según cuándo sea la cita", () => {
+    const dia = (today?: string) => reminderMessage({ ...appointment, today }, "{dia}");
+    expect(dia("2026-11-12")).toBe("hoy, jueves 12 de noviembre");
+    expect(dia("2026-11-11")).toBe("mañana, jueves 12 de noviembre");
+    expect(dia("2026-11-05")).toBe("el jueves 12 de noviembre");
+    expect(dia()).toBe("el jueves 12 de noviembre");
   });
 
   it("usa el texto de Giselle cuando lo hay", () => {
@@ -193,9 +202,10 @@ describe("reminderMessage", () => {
   });
 
   it("con un texto vacío, nulo o de solo espacios vuelve al de la app", () => {
-    expect(reminderMessage(appointment, "")).toBe(expected);
-    expect(reminderMessage(appointment, null)).toBe(expected);
-    expect(reminderMessage(appointment, " \n ")).toBe(expected);
+    const manana = { ...appointment, today: "2026-11-11" };
+    expect(reminderMessage(manana, "")).toBe(expected);
+    expect(reminderMessage(manana, null)).toBe(expected);
+    expect(reminderMessage(manana, " \n ")).toBe(expected);
   });
 
   it("el texto por defecto lleva el enlace y las normas", () => {
@@ -210,7 +220,7 @@ describe("reminderMessage", () => {
     const lateRule = rule("Puntualidad")
       .replace("10 minutos", "5 minutos")
       .replace("8\u00a0€", "5,50\u00a0€");
-    expect(reminderMessage({ ...appointment, norms })).toBe(
+    expect(reminderMessage({ ...appointment, norms, today: "2026-11-11" })).toBe(
       expected.replace(rule("Puntualidad"), lateRule),
     );
   });
