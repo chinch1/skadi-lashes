@@ -9,6 +9,15 @@ export function formatEuros(cents: number): string {
   return `${text}\u00a0€`;
 }
 
+// Los mismos céntimos leídos como dólares, sin conversión: en este negocio
+// 10 € se cobran como 10 $. 4500 -> "$45", 4550 -> "$45,50", 125000 -> "$1.250".
+export function formatDollars(cents: number): string {
+  const dollars = Math.round(cents) / 100;
+  const [whole, decimals] = dollars.toFixed(2).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return decimals === "00" ? `$${grouped}` : `$${grouped},${decimals}`;
+}
+
 // Para rellenar un campo de texto: "45" o "45,50".
 export function centsToInput(cents: number): string {
   return formatEuros(cents).replace("\u00a0€", "");
