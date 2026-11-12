@@ -8,7 +8,7 @@ export default async function Page() {
   const { supabase, studioId } = await requireAdminPage();
   const { data: studio, error } = await supabase
     .from("studios")
-    .select("deposit_cents, late_fee_cents, late_tolerance_min")
+    .select("deposit_cents, late_fee_cents, late_tolerance_min, pending_hold_minutes")
     .eq("id", studioId)
     .maybeSingle();
   if (error) console.error("[ajustes] leer montos:", error.message);
@@ -22,12 +22,13 @@ export default async function Page() {
         className="mt-6 rounded-2xl border border-border bg-white p-4"
       >
         <h2 id="montos" className="mb-4 text-lg font-semibold">
-          Montos
+          Montos y tiempos
         </h2>
         {studio ? (
           <AmountsForm
             depositCents={Number(studio.deposit_cents) || 0}
             lateFeeCents={Number(studio.late_fee_cents) || 0}
+            holdMinutes={Number(studio.pending_hold_minutes) || 5}
             lateToleranceMin={
               Number(studio.late_tolerance_min ?? DEFAULT_RULE_SETTINGS.lateToleranceMin) || 0
             }

@@ -49,7 +49,7 @@ export function DepositSwitch({
       <p id="abono-ayuda" className="text-sm text-muted">
         {shown
           ? "Paga el abono al agendar, como todas las clientas nuevas."
-          : "Clienta de confianza: agenda sin pagar abono y su cita queda confirmada de inmediato. Tampoco le aplica el plazo de 12 horas para reprogramar. Ella nunca ve esta etiqueta."}
+          : "Clienta de confianza: agenda sin pagar abono y tú confirmas su cita desde la Agenda. Tampoco le aplica el plazo de 12 horas para reprogramar. Ella nunca ve esta etiqueta."}
       </p>
       <p className="text-sm text-muted">
         El cambio vale para las citas que agende de ahora en adelante.

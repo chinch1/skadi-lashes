@@ -14,7 +14,12 @@ import {
   rejectionMessage,
   waLink,
 } from "@/lib/whatsapp";
-import { AppointmentCard, DepositCard, NotifyCard } from "./_agenda/cards";
+import {
+  AppointmentCard,
+  ConfirmationCard,
+  DepositCard,
+  NotifyCard,
+} from "./_agenda/cards";
 import { CopyLinkButton } from "./_agenda/copy-link-button";
 
 // Dirección pública del sitio, para los enlaces que se envían a las clientas.
@@ -47,6 +52,12 @@ function messageData(a: AgendaAppointment, link: string, norms: string) {
     norms,
   };
 }
+
+// Rechazo de una cita sin abono: el texto de la app habla del comprobante,
+// que aquí no existe. Solo se usa si Giselle no escribió el suyo.
+const NO_DEPOSIT_REJECTION_TEMPLATE =
+  "Hola {nombre}, no voy a poder atenderte el {fecha} a las {hora}, así que el horario quedó libre.\n\n" +
+  "Si quieres, puedes agendar otra fecha aquí: {enlace}";
 
 function serverNow(): number {
   return Date.now();
@@ -106,6 +117,28 @@ export default async function Page(props: PageProps<"/admin">) {
         </section>
       )}
 
+      {agenda.pendingConfirmations.length > 0 && (
+        <section aria-labelledby="por-confirmar" className="mt-6">
+          <h2
+            id="por-confirmar"
+            className="flex items-center gap-2 text-xl font-semibold"
+          >
+            Citas por confirmar
+            <span className="flex min-w-7 items-center justify-center rounded-full bg-primary px-2 py-0.5 text-sm text-white">
+              {agenda.pendingConfirmations.length}
+            </span>
+          </h2>
+          <p className="mt-1 mb-3 text-muted">
+            Clientas sin abono. Confirma si puedes atenderlas.
+          </p>
+          <ul className="flex flex-col gap-3">
+            {agenda.pendingConfirmations.map((a) => (
+              <ConfirmationCard key={a.id} appointment={a} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       {toNotify > 0 && (
         <section aria-labelledby="avisar" className="mt-8">
           <h2 id="avisar" className="text-xl font-semibold">
@@ -139,7 +172,9 @@ export default async function Page(props: PageProps<"/admin">) {
                   // El horario ya quedó libre: se envía el enlace para agendar.
                   rejectionMessage(
                     messageData(a, `${origin}/agendar`, norms),
-                    templates.rejection,
+                    a.depositCents === 0 && !templates.rejection?.trim()
+                      ? NO_DEPOSIT_REJECTION_TEMPLATE
+                      : templates.rejection,
                   ),
                 )}
               />
