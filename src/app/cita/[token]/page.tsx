@@ -9,6 +9,8 @@ import { formatEuros } from "@/lib/money";
 import { buildRules, type Rule } from "@/lib/rules";
 import { formatDuration } from "@/lib/services";
 import { getRuleSettings } from "@/lib/studio-settings";
+import { ChangeSlotButton } from "./change-slot-button";
+import { PaymentClock } from "./countdown";
 import { PaymentForm } from "./payment-form";
 
 // La página siempre muestra el estado actual de la cita.
@@ -19,43 +21,6 @@ export const metadata: Metadata = {
   title: "Tu cita",
   robots: { index: false, follow: false },
 };
-
-const STUDIO_TIME_ZONE = "America/Caracas";
-
-// Fecha "YYYY-MM-DD" y hora "HH:MM" de un instante, en la hora del estudio.
-function studioParts(instant: Date): { date: string; time: string } {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: STUDIO_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(instant);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return {
-    date: `${get("year")}-${get("month")}-${get("day")}`,
-    time: `${get("hour")}:${get("minute")}`,
-  };
-}
-
-function addDays(date: string, days: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
-
-// "hasta las 8:15 pm de hoy", "hasta las 9:00 am de mañana" o con la fecha.
-function holdDeadline(holdExpiresAt: string): string | null {
-  const instant = new Date(holdExpiresAt);
-  if (Number.isNaN(instant.getTime())) return null;
-  const hold = studioParts(instant);
-  const today = studioParts(new Date()).date;
-  const time = formatTime12(hold.time);
-  if (hold.date === today) return `hasta las ${time} de hoy`;
-  if (hold.date === addDays(today, 1)) return `hasta las ${time} de mañana`;
-  return `hasta las ${time} del ${formatLongDate(hold.date)}`;
-}
 
 function Summary({ view }: { view: BookingView }) {
   return (
@@ -138,12 +103,12 @@ function stateContent(
 ): { header: ReactNode; body?: ReactNode } {
   switch (view.state) {
     case "awaiting_payment": {
-      const deadline = view.holdExpiresAt ? holdDeadline(view.holdExpiresAt) : null;
       const pagoMovil = view.payment?.pagoMovil ?? null;
       const binance = view.payment?.binance ?? null;
+      const hold = view.holdExpiresAt;
       return {
         header: (
-          <Header title="Paga tu abono">
+          <Header title="Procede con el pago de la reserva">
             <p>
               Para confirmar tu cita, paga un abono de{" "}
               <strong className="font-semibold">
@@ -151,34 +116,54 @@ function stateContent(
               </strong>
               .
             </p>
-            {deadline && (
-              <p className="text-muted">
-                Tu horario está apartado {deadline}. Si no subes el comprobante
-                antes, se libera.
-              </p>
+            {hold && (
+              <div className="mt-2 flex flex-col gap-2">
+                <PaymentClock deadline={hold} serverNow={view.serverNow} />
+                <p className="text-center text-muted">
+                  Paga en el tiempo del reloj para conservar tu cupo. Si no, será
+                  liberado.
+                </p>
+              </div>
             )}
           </Header>
         ),
         body: (
           <>
-            <RuleList rules={rules} titles={["Abono"]} />
-            {pagoMovil || binance ? (
+            {(pagoMovil || binance) && hold ? (
               <PaymentForm
                 token={view.token}
                 depositCents={view.depositCents}
                 pagoMovil={pagoMovil}
                 binance={binance}
+                holdExpiresAt={hold}
+                serverNow={view.serverNow}
               />
             ) : (
               <p className="rounded-2xl border border-border bg-white p-5">
                 Por ahora no se puede pagar en línea. Escríbele a Skadi Lashes.
               </p>
             )}
+            {view.canChangeSlot && (
+              <ChangeSlotButton token={view.token} confirm primary={false} />
+            )}
             <CantComeLink token={view.token} />
           </>
         ),
       };
     }
+    case "awaiting_confirmation":
+      // También la ve la clienta de confianza: aquí no se habla de abonos ni de pagos.
+      return {
+        header: (
+          <Header title="Cita por confirmar">
+            <p className="text-muted">
+              Skadi revisará tu solicitud y te confirmará por WhatsApp. Tu horario
+              queda apartado mientras tanto.
+            </p>
+          </Header>
+        ),
+        body: <CantComeLink token={view.token} />,
+      };
     case "receipt_sent":
       return {
         header: (
@@ -214,11 +199,20 @@ function stateContent(
           <Header title="El tiempo para pagar terminó">
             <p className="text-muted">
               No recibimos el comprobante a tiempo y el horario se liberó.
-              Puedes agendar de nuevo cuando quieras.
+              {view.canChangeSlot
+                ? " Puedes elegir otro horario o agendar de nuevo."
+                : " Puedes agendar de nuevo cuando quieras."}
             </p>
           </Header>
         ),
-        body: (
+        body: view.canChangeSlot ? (
+          <>
+            <ChangeSlotButton token={view.token} confirm={false} primary />
+            <Link href="/agendar" className={secondaryButton}>
+              Agendar de nuevo
+            </Link>
+          </>
+        ) : (
           <Link href="/agendar" className={primaryButton}>
             Agendar de nuevo
           </Link>
@@ -227,7 +221,15 @@ function stateContent(
     case "released":
       return {
         header: <Header title="Esta cita fue liberada" />,
-        body: (
+        // Si la soltó para elegir otro horario y vuelve atrás, puede seguir eligiendo.
+        body: view.canChangeSlot ? (
+          <>
+            <ChangeSlotButton token={view.token} confirm={false} primary />
+            <Link href="/agendar" className={secondaryButton}>
+              Agendar una cita
+            </Link>
+          </>
+        ) : (
           <Link href="/agendar" className={primaryButton}>
             Agendar una cita
           </Link>

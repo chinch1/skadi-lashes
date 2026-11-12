@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { saveReceipt } from "@/lib/booking";
+import { releaseForSlotChange } from "@/lib/slot-change";
 
 export type ReceiptState = { error: string | null };
 
@@ -40,4 +41,22 @@ export async function submitReceipt(
 
   revalidatePath(`/cita/${token}`);
   return { error: null };
+}
+
+export type ChangeSlotState = { ok: true } | { ok: false; error: string };
+
+// Acción pública: suelta el horario apartado para elegir otro con la misma cita.
+export async function changeSlot(token: string): Promise<ChangeSlotState> {
+  if (typeof token !== "string" || !UUID_RE.test(token)) {
+    return { ok: false, error: "No encontramos esta cita." };
+  }
+  let result: ChangeSlotState;
+  try {
+    result = await releaseForSlotChange(token);
+  } catch (e) {
+    console.error("[otro horario] acción soltar:", e instanceof Error ? e.message : e);
+    return { ok: false, error: "No se pudo soltar tu horario. Intenta de nuevo." };
+  }
+  if (result.ok) revalidatePath(`/cita/${token}`);
+  return result;
 }

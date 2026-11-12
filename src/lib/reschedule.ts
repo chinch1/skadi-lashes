@@ -146,7 +146,7 @@ type AppointmentRecord = {
     depositCents: number;
     noticeHours: number;
     maxReschedules: number;
-    pendingHoldHours: number;
+    pendingHoldMinutes: number;
     bookingWindowWeeks: number;
     eurToVesRate: number | null;
   };
@@ -181,7 +181,7 @@ type RawAppointment = {
         deposit_cents: number;
         reschedule_notice_hours: number;
         max_reschedules: number;
-        pending_hold_hours: number;
+        pending_hold_minutes: number;
         booking_window_weeks: number;
         eur_to_ves_rate: number | string | null;
       }
@@ -203,7 +203,7 @@ async function loadAppointment(token: string): Promise<AppointmentRecord | null>
        appointment_services ( name, duration_min, price_cents ),
        deposits ( status ),
        studios ( slug, timezone, deposit_cents, reschedule_notice_hours, max_reschedules,
-                 pending_hold_hours, booking_window_weeks, eur_to_ves_rate )`,
+                 pending_hold_minutes, booking_window_weeks, eur_to_ves_rate )`,
     )
     .eq("manage_token", token.toLowerCase())
     .maybeSingle();
@@ -245,7 +245,8 @@ async function loadAppointment(token: string): Promise<AppointmentRecord | null>
       depositCents: Number(studio.deposit_cents) || 0,
       noticeHours: Number(studio.reschedule_notice_hours) || 0,
       maxReschedules: Number(studio.max_reschedules) || 0,
-      pendingHoldHours: Number(studio.pending_hold_hours) || 0,
+      // Minutos del reloj para pagar; 5 si el estudio no trae un valor válido.
+      pendingHoldMinutes: Number(studio.pending_hold_minutes) || 5,
       bookingWindowWeeks: Number(studio.booking_window_weeks) || 0,
       eurToVesRate: toNumber(studio.eur_to_ves_rate),
     },
@@ -485,7 +486,7 @@ export async function rescheduleAppointment(
               status: "pending_deposit",
               deposit_cents: newDeposit,
               hold_expires_at: new Date(
-                now.getTime() + record.studio.pendingHoldHours * HOUR_MS,
+                now.getTime() + record.studio.pendingHoldMinutes * 60_000,
               ).toISOString(),
               // La tasa se congela aquí, al llegar al paso de pago.
               quote_eur_to_ves: record.studio.eurToVesRate,
