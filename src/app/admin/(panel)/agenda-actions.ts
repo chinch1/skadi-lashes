@@ -17,6 +17,7 @@ const GENERIC_ERROR = "No se pudo guardar. Intenta de nuevo.";
 const NOT_FOUND = "No encontramos esta cita.";
 const ALREADY_REVIEWED = "Este abono ya fue revisado.";
 const NOT_ACTIVE = "Esta cita ya no está activa.";
+const APPOINTMENT_REVIEWED = "Esta cita ya fue revisada.";
 const NOT_STARTED = "Solo se puede marcar una cita confirmada que ya empezó.";
 
 function isUuid(value: unknown): value is string {
@@ -113,7 +114,7 @@ export async function rejectDeposit(depositId: string): Promise<Result> {
     // El horario se libera de inmediato. Si la clienta quiere, agenda de nuevo.
     const { error: releaseError } = await supabase
       .from("appointments")
-      .update({ status: "released", hold_expires_at: null })
+      .update({ status: "released", hold_expires_at: null, rejected_at: now })
       .eq("id", rejected[0].appointment_id)
       .eq("studio_id", studioId)
       .eq("status", "pending_deposit");
@@ -130,6 +131,63 @@ export async function rejectDeposit(depositId: string): Promise<Result> {
     return OK;
   } catch (e) {
     return failure("rechazar: inesperado", e);
+  } finally {
+    revalidatePath(PATH);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Citas sin abono por confirmar
+// ---------------------------------------------------------------------
+
+// Una cita sin abono (clienta de confianza o abono 0) llega como
+// pending_deposit con deposit_cents = 0 y espera a Giselle.
+export async function confirmAppointment(appointmentId: string): Promise<Result> {
+  const { supabase, studioId } = await requireAdminAction();
+  try {
+    if (!isUuid(appointmentId)) return { error: NOT_FOUND };
+
+    const { data, error } = await supabase
+      .from("appointments")
+      .update({ status: "confirmed", hold_expires_at: null })
+      .eq("id", appointmentId)
+      .eq("studio_id", studioId)
+      .eq("status", "pending_deposit")
+      .eq("deposit_cents", 0)
+      .select("id");
+    if (error) return failure("confirmar cita", error.message);
+    if (!data || data.length === 0) return { error: APPOINTMENT_REVIEWED };
+    return OK;
+  } catch (e) {
+    return failure("confirmar cita: inesperado", e);
+  } finally {
+    revalidatePath(PATH);
+  }
+}
+
+export async function rejectAppointment(appointmentId: string): Promise<Result> {
+  const { supabase, studioId } = await requireAdminAction();
+  try {
+    if (!isUuid(appointmentId)) return { error: NOT_FOUND };
+
+    // El horario se libera de inmediato.
+    const { data, error } = await supabase
+      .from("appointments")
+      .update({
+        status: "released",
+        hold_expires_at: null,
+        rejected_at: new Date().toISOString(),
+      })
+      .eq("id", appointmentId)
+      .eq("studio_id", studioId)
+      .eq("status", "pending_deposit")
+      .eq("deposit_cents", 0)
+      .select("id");
+    if (error) return failure("rechazar cita", error.message);
+    if (!data || data.length === 0) return { error: APPOINTMENT_REVIEWED };
+    return OK;
+  } catch (e) {
+    return failure("rechazar cita: inesperado", e);
   } finally {
     revalidatePath(PATH);
   }
@@ -153,14 +211,29 @@ export async function releaseAppointment(appointmentId: string): Promise<Result>
       return failure("liberar: estudio", studioError?.message ?? "No se encontró.");
     }
 
-    const { data: released, error } = await supabase
+    // Liberar una cita que aún no estaba confirmada es rechazarla: se anota
+    // rejected_at para avisar a la clienta. Una confirmada queda sin rechazo.
+    const nowIso = new Date().toISOString();
+    const pendingRes = await supabase
       .from("appointments")
-      .update({ status: "released" })
+      .update({ status: "released", hold_expires_at: null, rejected_at: nowIso })
       .eq("id", appointmentId)
       .eq("studio_id", studioId)
-      .in("status", ["pending_deposit", "confirmed"])
+      .eq("status", "pending_deposit")
       .select("id, starts_at");
-    if (error) return failure("liberar", error.message);
+    if (pendingRes.error) return failure("liberar", pendingRes.error.message);
+    let released = pendingRes.data;
+    if (!released || released.length === 0) {
+      const confirmedRes = await supabase
+        .from("appointments")
+        .update({ status: "released" })
+        .eq("id", appointmentId)
+        .eq("studio_id", studioId)
+        .eq("status", "confirmed")
+        .select("id, starts_at");
+      if (confirmedRes.error) return failure("liberar", confirmedRes.error.message);
+      released = confirmedRes.data;
+    }
     if (!released || released.length === 0) return { error: NOT_ACTIVE };
 
     // Con menos horas de aviso que las del estudio (o ya empezada), el abono

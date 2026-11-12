@@ -40,6 +40,7 @@ create table studios (
   reschedule_notice_hours  integer not null default 12  check (reschedule_notice_hours >= 0),
   max_reschedules          integer not null default 1   check (max_reschedules >= 0),
   pending_hold_hours       integer not null default 2   check (pending_hold_hours > 0),
+  pending_hold_minutes     integer not null default 5   check (pending_hold_minutes > 0),  -- reloj para pagar y subir el comprobante (reemplaza a pending_hold_hours)
   booking_window_weeks     integer not null default 8   check (booking_window_weeks > 0),
   receipt_retention_days   integer not null default 30  check (receipt_retention_days > 0),
 
@@ -166,6 +167,7 @@ create table appointments (
   quote_eur_to_ves      numeric(14, 4),                                  -- tasa congelada al llegar al paso de pago
   quote_eur_to_usdt     numeric(14, 6),                                  -- tasa congelada al llegar al paso de pago
   confirmation_sent_at  timestamptz,
+  rejected_at           timestamptz,                                     -- cuándo la dueña rechazó la cita o su comprobante
   created_at            timestamptz not null default now(),
   check (ends_at > starts_at),
 

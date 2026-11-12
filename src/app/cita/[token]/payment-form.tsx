@@ -6,6 +6,7 @@ import { formatBolivars, formatUsdt } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
 import { submitReceipt, type ReceiptState } from "./actions";
+import { useHoldRemaining } from "./countdown";
 
 type Method = "pago_movil" | "binance";
 type PagoMovil = { bank: string; phone: string; idNumber: string; amountVes: number };
@@ -127,12 +128,18 @@ export function PaymentForm({
   depositCents,
   pagoMovil,
   binance,
+  holdExpiresAt,
+  serverNow,
 }: {
   token: string;
   depositCents: number;
   pagoMovil: PagoMovil | null;
   binance: Binance | null;
+  holdExpiresAt: string;
+  serverNow: string;
 }) {
+  // Con el reloj en 0:00 el formulario se deshabilita; la página se recarga sola.
+  const timeUp = useHoldRemaining(holdExpiresAt, serverNow) <= 0;
   const onlyOne: Method | null =
     pagoMovil && !binance ? "pago_movil" : binance && !pagoMovil ? "binance" : null;
   const [method, setMethod] = useState<Method | null>(onlyOne);
@@ -171,7 +178,7 @@ export function PaymentForm({
 
   return (
     <form action={action} className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-3">
+      <fieldset disabled={timeUp && !pending} className="flex flex-col gap-3">
         <legend className="mb-3 text-lg font-semibold">¿Cómo vas a pagar?</legend>
         <div className="flex gap-3">
           {pagoMovil && (
@@ -253,12 +260,15 @@ export function PaymentForm({
             className="max-h-72 w-full rounded-xl border border-border bg-white object-contain"
           />
         )}
-        <label className={`${secondaryButton} cursor-pointer`}>
+        <label
+          className={`${secondaryButton} ${timeUp ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
+        >
           {preview ? "Cambiar comprobante" : "Subir comprobante"}
           <input
             type="file"
             name="receipt_file"
             accept="image/*"
+            disabled={timeUp}
             className="sr-only"
             onChange={async (e) => {
               const file = e.target.files?.[0];
@@ -272,6 +282,12 @@ export function PaymentForm({
         </label>
       </div>
 
+      {timeUp && !pending && (
+        <p role="status" className="text-sm text-red-800">
+          El tiempo para pagar terminó.
+        </p>
+      )}
+
       {state.error && (
         <p role="alert" className="text-sm text-red-800">
           {state.error}
@@ -280,7 +296,7 @@ export function PaymentForm({
 
       <button
         type="submit"
-        disabled={pending || !method || !receipt}
+        disabled={pending || timeUp || !method || !receipt}
         className={primaryButton}
       >
         {pending ? "Enviando…" : "Enviar comprobante"}

@@ -2,6 +2,7 @@ import "server-only";
 import { EUR_TO_USDT } from "@/lib/booking-config";
 import { getMonthAvailability } from "@/lib/availability-data";
 import { normalizePhone } from "@/lib/phone";
+import { offersSlotChange } from "@/lib/slot-change-rules";
 import { STUDIO_SLUG } from "@/lib/studio";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { zonedParts, zonedToUtc } from "@/lib/time";
@@ -36,6 +37,7 @@ export type BookingResult =
 
 export type BookingState =
   | "awaiting_payment"
+  | "awaiting_confirmation" // sin abono: espera que Skadi la confirme
   | "receipt_sent"
   | "confirmed"
   | "expired"
@@ -55,6 +57,8 @@ export type BookingView = {
   durationMin: number;
   depositCents: number; // 0 para clientas de confianza
   holdExpiresAt: string | null; // ISO; solo tiene sentido en awaiting_payment
+  serverNow: string; // ISO; hora del servidor al armar la vista, para el reloj de pago
+  canChangeSlot: boolean; // se ofrece "Elegir otro horario"
   payment: null | {
     pagoMovil: { bank: string; phone: string; idNumber: string; amountVes: number } | null;
     binance: { account: string; amountUsdt: number } | null;
@@ -83,6 +87,13 @@ const RECEIPT_ERROR = "No se pudo enviar el comprobante. Intenta de nuevo.";
 
 const RECEIPT_BUCKET = "receipts";
 const MAX_RECEIPT_BYTES = 3.5 * 1024 * 1024;
+
+// Un comprobante cuya subida empezó a tiempo no falla por una conexión lenta:
+// se acepta hasta 30 segundos después del reloj, si la cita sigue esperando el pago.
+const RECEIPT_GRACE_MS = 30_000;
+
+// Minutos del reloj para pagar si el estudio no trae un valor válido.
+const DEFAULT_HOLD_MINUTES = 5;
 
 function isUuid(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
@@ -198,7 +209,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
     const { data: studio, error: studioError } = await supabase
       .from("studios")
-      .select("id, timezone, deposit_cents, pending_hold_hours, eur_to_ves_rate")
+      .select("id, timezone, deposit_cents, pending_hold_minutes, eur_to_ves_rate")
       .eq("slug", STUDIO_SLUG)
       .maybeSingle();
     if (studioError) return bookingFailure("estudio", studioError.message);
@@ -253,10 +264,13 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
 
     const studioDeposit = Number(studio.deposit_cents) || 0;
     const skipsDeposit = client.depositExempt || studioDeposit <= 0;
+    const holdMinutes = Number(studio.pending_hold_minutes) || DEFAULT_HOLD_MINUTES;
 
+    // Nada se confirma solo: sin abono, la cita queda apartada (sin reloj)
+    // hasta que Skadi la confirme o la rechace.
     const appointmentRow = skipsDeposit
       ? {
-          status: "confirmed",
+          status: "pending_deposit",
           deposit_cents: 0,
           hold_expires_at: null,
           quote_eur_to_ves: null,
@@ -265,9 +279,7 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
       : {
           status: "pending_deposit",
           deposit_cents: studioDeposit,
-          hold_expires_at: new Date(
-            now.getTime() + Number(studio.pending_hold_hours) * 3_600_000,
-          ).toISOString(),
+          hold_expires_at: new Date(now.getTime() + holdMinutes * 60_000).toISOString(),
           // La tasa se congela aquí, al llegar al paso de pago.
           quote_eur_to_ves: toNumber(studio.eur_to_ves_rate),
           quote_eur_to_usdt: EUR_TO_USDT,
@@ -403,6 +415,8 @@ type AppointmentRecord = {
   holdExpiresAt: string | null;
   quoteVes: number | null;
   quoteUsdt: number | null;
+  rejectedAt: string | null;
+  createdAt: string;
   clientFirstName: string;
   services: { name: string; durationMin: number; priceCents: number }[];
   depositStatuses: string[];
@@ -438,6 +452,8 @@ type RawAppointment = {
   hold_expires_at: string | null;
   quote_eur_to_ves: number | string | null;
   quote_eur_to_usdt: number | string | null;
+  rejected_at: string | null;
+  created_at: string;
   clients: { first_name: string } | { first_name: string }[] | null;
   appointment_services:
     | { name: string; duration_min: number; price_cents: number }[]
@@ -463,6 +479,7 @@ async function loadAppointment(token: string): Promise<AppointmentRecord | null>
     .select(
       `id, studio_id, manage_token, status, starts_at, ends_at, deposit_cents,
        total_cents, hold_expires_at, quote_eur_to_ves, quote_eur_to_usdt,
+       rejected_at, created_at,
        clients ( first_name ),
        appointment_services ( name, duration_min, price_cents ),
        deposits ( status ),
@@ -489,6 +506,8 @@ async function loadAppointment(token: string): Promise<AppointmentRecord | null>
     holdExpiresAt: row.hold_expires_at,
     quoteVes: toNumber(row.quote_eur_to_ves),
     quoteUsdt: toNumber(row.quote_eur_to_usdt),
+    rejectedAt: row.rejected_at,
+    createdAt: row.created_at,
     clientFirstName: one(row.clients)?.first_name ?? "",
     services: many(row.appointment_services).map((s) => ({
       name: s.name,
@@ -517,7 +536,8 @@ function stateOf(record: AppointmentRecord, now: Date): BookingState {
     case "released":
       return "released";
   }
-  // pending_deposit
+  // pending_deposit. Sin abono no hay nada que pagar: espera a Skadi.
+  if (record.depositCents === 0) return "awaiting_confirmation";
   if (record.depositStatuses.some((s) => s === "pending" || s === "approved")) {
     return "receipt_sent";
   }
@@ -565,7 +585,8 @@ export async function getBookingView(token: string): Promise<BookingView | null>
   }
   if (!record) return null;
 
-  const state = stateOf(record, new Date());
+  const now = new Date();
+  const state = stateOf(record, now);
   const tz = record.studio.timezone;
   const start = zonedParts(new Date(record.startsAt), tz);
   const end = zonedParts(new Date(record.endsAt), tz);
@@ -582,6 +603,17 @@ export async function getBookingView(token: string): Promise<BookingView | null>
     durationMin: record.services.reduce((sum, s) => sum + s.durationMin, 0),
     depositCents: record.depositCents,
     holdExpiresAt: state === "awaiting_payment" ? record.holdExpiresAt : null,
+    serverNow: now.toISOString(),
+    canChangeSlot:
+      (state === "awaiting_payment" || state === "expired" || state === "released") &&
+      offersSlotChange({
+        status: record.status,
+        depositCents: record.depositCents,
+        depositStatuses: record.depositStatuses,
+        rejectedAt: record.rejectedAt,
+        createdAt: new Date(record.createdAt),
+        now,
+      }),
     payment: state === "awaiting_payment" ? paymentOf(record) : null,
   };
 }
@@ -654,7 +686,9 @@ export async function saveReceipt(
     const record = await loadAppointment(token);
     if (!record) return { ok: false, error: "No encontramos esta cita." };
 
-    const state = stateOf(record, new Date());
+    // El vencimiento se mira con el margen de gracia: lo que llega hasta 30 s
+    // tarde cuenta como a tiempo.
+    const state = stateOf(record, new Date(Date.now() - RECEIPT_GRACE_MS));
     if (state === "expired") {
       return { ok: false, error: "El tiempo para pagar esta cita terminó. Agenda de nuevo." };
     }
@@ -720,7 +754,10 @@ export async function saveReceipt(
       .update({ hold_expires_at: null })
       .eq("id", record.id)
       .eq("status", "pending_deposit")
-      .or(`hold_expires_at.is.null,hold_expires_at.gt.${new Date().toISOString()}`)
+      .gt("deposit_cents", 0)
+      .or(
+        `hold_expires_at.is.null,hold_expires_at.gt.${new Date(Date.now() - RECEIPT_GRACE_MS).toISOString()}`,
+      )
       .select("id");
     if (holdError) {
       await rollback();

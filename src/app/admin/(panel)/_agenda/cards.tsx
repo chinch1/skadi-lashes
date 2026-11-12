@@ -7,6 +7,7 @@ import { formatPhone } from "@/lib/phone";
 import { formatDuration } from "@/lib/services";
 import { waLink } from "@/lib/whatsapp";
 import { AppointmentActions } from "./appointment-actions";
+import { ConfirmationActions } from "./confirmation-actions";
 import { DepositActions } from "./deposit-actions";
 import { NotifyActions } from "./notify-actions";
 
@@ -80,6 +81,49 @@ export function DepositCard({ deposit }: { deposit: PendingDeposit }) {
   );
 }
 
+function WhatsAppChat({ appointment: a }: { appointment: AgendaAppointment }) {
+  return (
+    <a
+      href={waLink(a.client.phone, "")}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="-ml-3 mt-1 flex min-h-11 w-fit items-center gap-2 rounded-lg px-3 font-medium text-whatsapp"
+    >
+      <span>WhatsApp</span>
+      <span className="text-muted">{formatPhone(a.client.phone)}</span>
+    </a>
+  );
+}
+
+// Cita sin abono que espera que Giselle la confirme o la rechace.
+export function ConfirmationCard({ appointment: a }: { appointment: AgendaAppointment }) {
+  return (
+    <li className="rounded-2xl border-2 border-primary bg-white p-4 shadow-sm">
+      <h3 className="text-lg font-semibold break-words">{fullName(a)}</h3>
+      <p className="first-letter:uppercase">{formatLongDate(a.date)}</p>
+      <p>{timeRange(a)}</p>
+      <p className="mt-1 text-sm break-words text-muted">{serviceNames(a)}</p>
+      <p className="text-sm text-muted">
+        {formatDuration(a.durationMin)} · {formatEuros(a.totalCents)}
+      </p>
+      <p className="mt-1 text-sm text-muted">Sin abono</p>
+
+      <WhatsAppChat appointment={a} />
+
+      <div className="mt-2">
+        <ConfirmationActions appointmentId={a.id} />
+      </div>
+    </li>
+  );
+}
+
+function notifyLabel(a: AgendaAppointment, kind: "confirmation" | "rejection"): string {
+  if (a.depositCents === 0) {
+    return kind === "confirmation" ? "Cita confirmada" : "Cita rechazada";
+  }
+  return kind === "confirmation" ? "Abono aprobado" : "Comprobante rechazado";
+}
+
 export function NotifyCard({
   appointment: a,
   kind,
@@ -94,7 +138,7 @@ export function NotifyCard({
       <p
         className={`text-sm font-medium ${kind === "confirmation" ? "text-whatsapp" : "text-red-800"}`}
       >
-        {kind === "confirmation" ? "Abono aprobado" : "Comprobante rechazado"}
+        {notifyLabel(a, kind)}
       </p>
       <h3 className="mt-1 text-lg font-semibold break-words">{fullName(a)}</h3>
       <p className="mb-3 text-muted">
@@ -111,7 +155,10 @@ export function NotifyCard({
 function StatusChip({ appointment: a }: { appointment: AgendaAppointment }) {
   let label: string;
   let tone = "bg-tint text-primary";
-  if (a.status === "pending_deposit" && a.awaitingReceipt) {
+  if (a.status === "pending_deposit" && a.awaitingConfirmation) {
+    label = "Por confirmar";
+    tone = "bg-amber-50 text-amber-900";
+  } else if (a.status === "pending_deposit" && a.awaitingReceipt) {
     label = a.holdDeadline
       ? `Esperando comprobante hasta las ${formatTime12(a.holdDeadline)}`
       : "Esperando comprobante";
@@ -173,15 +220,7 @@ export function AppointmentCard({
         {formatDuration(a.durationMin)} · {formatEuros(a.totalCents)}
       </p>
 
-      <a
-        href={waLink(a.client.phone, "")}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="-ml-3 mt-1 flex min-h-11 w-fit items-center gap-2 rounded-lg px-3 font-medium text-whatsapp"
-      >
-        <span>WhatsApp</span>
-        <span className="text-muted">{formatPhone(a.client.phone)}</span>
-      </a>
+      <WhatsAppChat appointment={a} />
 
       {active && (
         <div className="mt-2">

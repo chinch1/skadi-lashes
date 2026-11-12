@@ -8,7 +8,6 @@ import type { BookingResult } from "@/lib/booking";
 import { formatLongDate, formatTime12 } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
 import { FOREIGN_PHONE_HINT, formatPhoneInput } from "@/lib/phone";
-import { RULES } from "@/lib/rules";
 import { formatDuration, photoUrl, type Section, type Service } from "@/lib/services";
 import { bookAppointment } from "./actions";
 import { CalendarStep, monthOf } from "./calendar-step";
@@ -23,8 +22,6 @@ const TITLES: Record<Step, string> = {
   datetime: "Elige el día y la hora",
   details: "Tus datos",
 };
-
-const DEPOSIT_RULE = RULES.find((rule) => rule.title === "Abono")!.text;
 
 const focusRing =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
@@ -420,8 +417,6 @@ export function BookingFlow({
               </div>
             </dl>
           </section>
-
-          <p className="text-sm text-muted">{DEPOSIT_RULE}</p>
 
           {formError && (
             <p

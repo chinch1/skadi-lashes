@@ -41,9 +41,10 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 - Paso 11 hecho y publicado: app instalable. Dos manifiestos en `public/`: `manifest.webmanifest` (clientas, abre en `/`) y `admin.webmanifest` (Giselle, abre en `/admin`, lo enlaza el diseño de `/admin`). Iconos en `public/icons/`, generados del logo sobre fondo blanco. Sin service worker: no hay modo sin conexión, a propósito, para no mostrar cupos viejos.
 - Ajustes de montos hechos y publicados: tarjeta "Montos" en `/admin/ajustes` para el abono (`deposit_cents`) y el cargo por retraso (`late_fee_cents`). Las normas que ve la clienta ya no son texto fijo: se arman con `buildRules()` de `src/lib/rules.ts` a partir de los valores del estudio (`src/lib/studio-settings.ts`). Los mensajes de WhatsApp por defecto usan el marcador `{normas}`. La tolerancia de retraso y las horas de aviso ya se leen de la base, pero todavía no se pueden editar.
 - Velocidad (11 nov 2026): la sesión de `/admin` se verifica con `getClaims()`, sin viajar a Supabase (el proyecto firma con ES256); una sesión cerrada desde otro dispositivo vale hasta que vence, como mucho una hora. La fila del estudio llega junto con la comprobación de administradora (`requireAdminPage()` devuelve `studio`). Hay pantallas de carga (`loading.tsx`) y Cloudflare usa "Smart Placement" (`placement` en `wrangler.jsonc`). En local, las pantallas del panel bajaron de 0,6–1,3 s a 0,4–0,85 s.
+- Cambios del agendado (12 nov 2026), sin publicar: (1) reloj de pago: el cupo se aparta `studios.pending_hold_minutes` minutos (5 por defecto, editable en Ajustes; `pending_hold_hours` quedó en desuso), con cuenta regresiva en `/cita/<token>` y 30 s de margen para un comprobante que ya venía en camino; (2) "Elegir otro horario" desde el pago o con el reloj vencido: libera el cupo y lleva a `/cita/<token>/horario`, reutiliza la misma cita y no cuenta como reprogramación (`src/lib/slot-change.ts`); (3) Skadi confirma toda cita: una cita sin abono (abono 0 o clienta de confianza) se crea `pending_deposit` con `deposit_cents` 0 y sin vencimiento, la clienta ve "Cita por confirmar" y la Agenda la lista en "Citas por confirmar" con Confirmar y Rechazar; `appointments.rejected_at` marca los rechazos de la dueña para avisar a la clienta. Fila de Servicios compacta con indicador de visibilidad: publicada.
 - Textos de WhatsApp editables por Giselle en `/admin/ajustes/mensajes`: aprobación, rechazo, recordatorio de la cita de mañana y recordatorio de retoque. Se guardan en `studios.confirmation_message`, `rejection_message`, `reminder_message` y `retouch_message` (nulo = texto por defecto). Marcadores: `{nombre}`, `{fecha}`, `{hora}`, `{servicios}`, `{enlace}`, `{normas}`.
 - Tasas: cargadas desde la fuente el 11 nov 2026. Se muestran en el inicio de la clienta y en la Agenda. La tarea diaria es un disparador programado de Cloudflare (`custom-worker.ts`, `triggers` en `wrangler.jsonc`) que llama a `POST /api/tasks/rates`; corre a las 10:00 y 22:00 UTC. `COTIZA_VE_API_KEY` está cargada como secreto en Cloudflare. Publicado el 11 nov 2026. Llamada a mano desde el sitio publicado, la ruta de tasas consultó la fuente y guardó el valor; falta confirmar que la ejecución programada corre sola.
-- Datos de prueba en la base: horas de prueba en `day_slots` (lunes a viernes de noviembre 2026 a las 9:00, 11:30 y 2:00), cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`) con varias citas en distintos estados, y una reserva de prueba hecha por Nico a su nombre (19 nov 2026, con abono por aprobar; no tocarla sin preguntar). Borrar todo antes de abrir al público.
+- La base ya tiene datos reales (servicios de Giselle, clientas y citas desde el 12 nov 2026): no crear ni borrar datos de prueba sin avisar a Nico. Nota anterior sobre datos de prueba, ya desactualizada: horas de prueba en `day_slots` (lunes a viernes de noviembre 2026 a las 9:00, 11:30 y 2:00), cinco servicios `PRUEBA · …`, una clienta de prueba (`+584120000001`) con varias citas en distintos estados, y una reserva de prueba hecha por Nico a su nombre (19 nov 2026, con abono por aprobar; no tocarla sin preguntar). Borrar todo antes de abrir al público.
 
 ## Reglas del negocio
 
@@ -92,7 +93,7 @@ Contexto del proyecto para continuar la implementación. Resume todo lo decidido
 ### Clientas de confianza
 
 - `clients.deposit_exempt` = verdadero: la clienta no ve el paso de pago.
-- Su cita se guarda con abono 0 y pasa directo a `confirmed`.
+- Su cita se guarda con abono 0 y queda por confirmar: Skadi confirma toda cita desde la Agenda (decidido por Nico el 12 nov 2026; antes pasaba directo a `confirmed`).
 - No le aplica el plazo para reprogramar.
 - La clienta nunca ve una etiqueta. La app solo oculta el paso.
 - Toda clienta nueva pide abono por defecto.
@@ -165,7 +166,7 @@ Reservar, reprogramar y liberar pasan por el servidor con la llave de servicio. 
 - Pantalla "Cita confirmada" para la clienta sin abono.
 - Textos de "Reprogramar" para la clienta sin abono.
 - Estado bloqueado de "Reprogramar" cuando la cita ya se cambió una vez.
-- Tiempo de reserva de un horario mientras se aprueba el abono (propuesto: 2 horas).
+- El abono (10 €) es mayor que el precio de algunos servicios (por ejemplo, 8 €): decidir si se limita al total de la cita.
 - Intervalo entre horas ofrecidas (propuesto: 30 minutos) y descanso entre clientas.
 - Agregar a Ajustes: datos de pago, tasas, minutos de tolerancia, horas de aviso. (El abono y el cargo por retraso ya están.)
 

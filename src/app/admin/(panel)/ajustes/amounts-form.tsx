@@ -12,11 +12,18 @@ type Props = {
   depositCents: number;
   lateFeeCents: number;
   lateToleranceMin: number;
+  holdMinutes: number;
 };
 
-export function AmountsForm({ depositCents, lateFeeCents, lateToleranceMin }: Props) {
+export function AmountsForm({
+  depositCents,
+  lateFeeCents,
+  lateToleranceMin,
+  holdMinutes,
+}: Props) {
   const [deposit, setDeposit] = useState(() => centsToInput(depositCents));
   const [lateFee, setLateFee] = useState(() => centsToInput(lateFeeCents));
+  const [minutes, setMinutes] = useState(() => String(holdMinutes));
 
   const [state, action, pending] = useActionState(
     async (prev: AmountsState, formData: FormData): Promise<AmountsState> => {
@@ -32,14 +39,16 @@ export function AmountsForm({ depositCents, lateFeeCents, lateToleranceMin }: Pr
   // Se compara el monto, no el texto: "10" y "10,00" son lo mismo.
   // Tras guardar, la página vuelve con los montos nuevos como guardados.
   const unchanged =
-    parseEuros(deposit) === depositCents && parseEuros(lateFee) === lateFeeCents;
+    parseEuros(deposit) === depositCents &&
+    parseEuros(lateFee) === lateFeeCents &&
+    parseMinutes(minutes) === holdMinutes;
 
   return (
     <form action={action} className="flex flex-col gap-4">
       <AmountInput
         name="deposit"
         label="Abono para agendar (€)"
-        help="Lo que paga la clienta para apartar su cita. No es reembolsable. Con 0, las citas se confirman sin pago."
+        help="Lo que paga la clienta para apartar su cita. No es reembolsable. Con 0, no se pide pago: tú confirmas cada cita desde la Agenda."
         value={deposit}
         onChange={setDeposit}
         error={state.fieldErrors.deposit}
@@ -51,6 +60,16 @@ export function AmountsForm({ depositCents, lateFeeCents, lateToleranceMin }: Pr
         value={lateFee}
         onChange={setLateFee}
         error={state.fieldErrors.late_fee}
+      />
+      <AmountInput
+        name="hold_minutes"
+        label="Tiempo para pagar (minutos)"
+        help="El reloj que ve la clienta para pagar y subir el comprobante. Si se acaba, el horario se libera."
+        value={minutes}
+        onChange={setMinutes}
+        error={state.fieldErrors.hold_minutes}
+        inputMode="numeric"
+        maxLength={3}
       />
 
       {state.error && (
@@ -75,6 +94,12 @@ export function AmountsForm({ depositCents, lateFeeCents, lateToleranceMin }: Pr
   );
 }
 
+// Minutos enteros escritos por Giselle; null si no es un número entero.
+function parseMinutes(text: string): number | null {
+  const trimmed = text.trim();
+  return /^\d{1,3}$/.test(trimmed) ? Number(trimmed) : null;
+}
+
 function AmountInput({
   name,
   label,
@@ -82,6 +107,8 @@ function AmountInput({
   value,
   onChange,
   error,
+  inputMode = "decimal",
+  maxLength = 8,
 }: {
   name: AmountField;
   label: string;
@@ -89,6 +116,8 @@ function AmountInput({
   value: string;
   onChange: (value: string) => void;
   error?: string;
+  inputMode?: "decimal" | "numeric";
+  maxLength?: number;
 }) {
   const id = `monto-${name}`;
   return (
@@ -100,10 +129,10 @@ function AmountInput({
         id={id}
         name={name}
         type="text"
-        inputMode="decimal"
+        inputMode={inputMode}
         autoComplete="off"
         required
-        maxLength={8}
+        maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
