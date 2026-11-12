@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { addDays, zonedParts, zonedToUtc } from "@/lib/time";
 
 // Lo que Giselle ve en la Agenda: abonos por revisar, citas sin abono por
-// confirmar, clientas por avisar y las citas del día. Las tablas se leen con
+// confirmar, clientas por avisar, las citas del día y las próximas. Las tablas se leen con
 // su propia sesión (seguridad por filas); la llave de servicio solo firma
 // enlaces a los comprobantes.
 
@@ -23,11 +23,8 @@ export type AgendaAppointment = {
   endTime: string;
   startsAt: string; // ISO
   status: AgendaStatus;
-  awaitingReceipt: boolean; // pending_deposit, sin abono pendiente ni aprobado, reserva vigente
   // pending_deposit sin pago (abono 0): espera que Giselle la confirme o la rechace.
   awaitingConfirmation: boolean;
-  holdExpiresAt: string | null; // ISO
-  holdDeadline: string | null; // "HH:MM" local de holdExpiresAt
   client: { id: string; firstName: string; lastName: string; phone: string };
   services: { name: string; durationMin: number; priceCents: number }[];
   totalCents: number;
@@ -57,6 +54,10 @@ export type AgendaData = {
   toConfirm: AgendaAppointment[];
   toNotifyRejection: AgendaAppointment[];
   dayAppointments: AgendaAppointment[];
+  // Citas desde ahora en adelante (confirmadas, por aprobar o por confirmar),
+  // como mucho UPCOMING_LIMIT.
+  upcoming: AgendaAppointment[];
+  upcomingTruncated: boolean;
   // Horas de aviso: liberar con menos tiempo hace perder el abono.
   noticeHours: number;
   // Textos de WhatsApp de Giselle; null = el de la app.
@@ -66,6 +67,11 @@ export type AgendaData = {
 const RECEIPT_BUCKET = "receipts";
 const SIGNED_URL_SECONDS = 900;
 const LOAD_ERROR = "No se pudo cargar la agenda.";
+
+// Cuántas citas próximas se muestran como mucho.
+export const UPCOMING_LIMIT = 100;
+// Se leen unas de más por si alguna es un horario apartado sin pagar, que se descarta.
+const UPCOMING_FETCH = UPCOMING_LIMIT + 20;
 
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
@@ -150,11 +156,13 @@ type RawPendingDeposit = {
 // Cita leída más lo que hace falta para clasificarla.
 type Loaded = {
   view: AgendaAppointment;
-  deposits: RawDepositSummary[];
-  holdExpired: boolean; // pending_deposit con pago, sin comprobante y con la reserva vencida
+  // pending_deposit que pide abono y todavía no tiene comprobante (vigente o
+  // vencido): es solo un horario apartado mientras la clienta paga. No es
+  // asunto de Giselle hasta que suba el comprobante.
+  unpaidHold: boolean;
 };
 
-function toLoaded(row: RawAppointment, timeZone: string, now: Date): Loaded {
+function toLoaded(row: RawAppointment, timeZone: string): Loaded {
   const start = zonedParts(new Date(row.starts_at), timeZone);
   const end = zonedParts(new Date(row.ends_at), timeZone);
   const deposits = many(row.deposits);
@@ -170,16 +178,9 @@ function toLoaded(row: RawAppointment, timeZone: string, now: Date): Loaded {
   // Sin abono no hay pago ni reloj: la cita espera a Giselle, no un comprobante.
   const awaitingConfirmation = isPending && (Number(row.deposit_cents) || 0) === 0;
   const receiptSent = deposits.some((d) => d.status === "pending" || d.status === "approved");
-  const holdExpired =
-    isPending &&
-    !awaitingConfirmation &&
-    !receiptSent &&
-    row.hold_expires_at !== null &&
-    new Date(row.hold_expires_at).getTime() < now.getTime();
 
   return {
-    deposits,
-    holdExpired,
+    unpaidHold: isPending && !awaitingConfirmation && !receiptSent,
     view: {
       id: row.id,
       token: String(row.manage_token),
@@ -188,12 +189,7 @@ function toLoaded(row: RawAppointment, timeZone: string, now: Date): Loaded {
       endTime: end.time,
       startsAt: row.starts_at,
       status: row.status,
-      awaitingReceipt: isPending && !awaitingConfirmation && !receiptSent && !holdExpired,
       awaitingConfirmation,
-      holdExpiresAt: row.hold_expires_at,
-      holdDeadline: row.hold_expires_at
-        ? zonedParts(new Date(row.hold_expires_at), timeZone).time
-        : null,
       client: {
         id: client?.id ?? "",
         firstName: client?.first_name ?? "",
@@ -272,7 +268,7 @@ export async function getAgenda(
   const dayStart = zonedToUtc(day, "00:00", timeZone).toISOString();
   const dayEnd = zonedToUtc(addDays(day, 1), "00:00", timeZone).toISOString();
 
-  const [pendingRes, unpaidRes, confirmRes, rejectedRes, dayRes] = await Promise.all([
+  const [pendingRes, unpaidRes, confirmRes, rejectedRes, dayRes, upcomingRes] = await Promise.all([
     // Todos los abonos por revisar, del más antiguo al más nuevo.
     supabase
       .from("deposits")
@@ -319,15 +315,25 @@ export async function getAgenda(
       .gte("starts_at", dayStart)
       .lt("starts_at", dayEnd)
       .order("starts_at", { ascending: true }),
+    // Próximas citas, desde ahora.
+    supabase
+      .from("appointments")
+      .select(APPOINTMENT_SELECT)
+      .eq("studio_id", studioId)
+      .in("status", ["confirmed", "pending_deposit"])
+      .gt("starts_at", nowIso)
+      .order("starts_at", { ascending: true })
+      .limit(UPCOMING_FETCH),
   ]);
   if (pendingRes.error) fail("abonos por revisar", pendingRes.error.message);
   if (unpaidRes.error) fail("citas por confirmar", unpaidRes.error.message);
   if (confirmRes.error) fail("por avisar", confirmRes.error.message);
   if (rejectedRes.error) fail("rechazados", rejectedRes.error.message);
   if (dayRes.error) fail("citas del día", dayRes.error.message);
+  if (upcomingRes.error) fail("próximas citas", upcomingRes.error.message);
 
   const load = (rows: unknown[] | null) =>
-    (rows ?? []).map((row) => toLoaded(row as RawAppointment, timeZone, now));
+    (rows ?? []).map((row) => toLoaded(row as RawAppointment, timeZone));
 
   // Abonos por revisar.
   const pendingRows = (pendingRes.data ?? []) as unknown as RawPendingDeposit[];
@@ -348,7 +354,7 @@ export async function getAgenda(
       paidAmount: toNumber(d.paid_amount),
       amountCents: Number(d.amount_cents) || 0,
       receiptUrl: d.receipt_path ? (signed.get(d.receipt_path) ?? null) : null,
-      appointment: toLoaded(appointment, timeZone, now).view,
+      appointment: toLoaded(appointment, timeZone).view,
     });
   }
 
@@ -393,10 +399,19 @@ export async function getAgenda(
       .map((a) => a.view);
   }
 
-  // Citas del día, sin las reservas vencidas.
+  // Citas del día, sin los horarios apartados que aún no tienen comprobante.
   const dayAppointments = load(dayRes.data)
-    .filter((a) => !a.holdExpired)
+    .filter((a) => !a.unpaidHold)
     .map((a) => a.view);
+
+  // Próximas citas, con el mismo criterio.
+  const upcomingRows = upcomingRes.data ?? [];
+  const upcomingAll = load(upcomingRows)
+    .filter((a) => !a.unpaidHold)
+    .map((a) => a.view);
+  const upcoming = upcomingAll.slice(0, UPCOMING_LIMIT);
+  const upcomingTruncated =
+    upcomingAll.length > UPCOMING_LIMIT || upcomingRows.length >= UPCOMING_FETCH;
 
   return {
     timeZone,
@@ -407,6 +422,8 @@ export async function getAgenda(
     toConfirm,
     toNotifyRejection,
     dayAppointments,
+    upcoming,
+    upcomingTruncated,
     noticeHours: Number(studio.reschedule_notice_hours ?? 12) || 0,
     messageTemplates: {
       confirmation: studio.confirmation_message ?? null,
