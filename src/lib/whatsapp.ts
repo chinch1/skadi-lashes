@@ -118,5 +118,8 @@ export function retouchMessage(
 // "+584121234567" -> "https://wa.me/584121234567?text=…"
 export function waLink(phoneE164: string, text: string): string {
   const digits = phoneE164.replace(/\D/g, "");
+  // Sin mensaje, el enlace abre el chat y nada más. Un `?text=` vacío hace que
+  // WhatsApp pueda rellenar el campo con un borrador anterior.
+  if (!text.trim()) return `https://wa.me/${digits}`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
