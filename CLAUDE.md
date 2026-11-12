@@ -164,7 +164,7 @@ Aparecen en el inicio. No se repiten en el paso de pago.
 ### Mensajes de WhatsApp
 
 - Cuatro textos editables por Giselle en Ajustes: aprobación, rechazo, recordatorio de la cita de mañana y recordatorio de retoque.
-- Marcadores: `{nombre}`, `{fecha}`, `{hora}`, `{servicios}`, `{enlace}`, `{normas}`.
+- Marcadores: `{nombre}`, `{fecha}`, `{dia}` ("hoy, …", "mañana, …" o "el …"), `{hora}`, `{servicios}`, `{enlace}`, `{normas}`.
 - El enlace del mensaje de confirmación lleva a la página privada de la cita, desde donde la clienta puede reprogramar o avisar que no va.
 
 ## Pantallas
@@ -181,7 +181,7 @@ Aparecen en el inicio. No se repiten en el paso de pago.
 
 ### Giselle (`/admin`)
 
-- Agenda: abonos por aprobar, citas por confirmar, avisos por WhatsApp, citas en dos vistas ("Día", con navegación, y "Próximas", todas las futuras agrupadas por día), copiar enlace de reservas, tasa del día. Cada cita tiene a la derecha un botón de WhatsApp y "Liberar". Las reservas que aún esperan el pago no aparecen: solo viven los minutos del reloj.
+- Agenda: abonos por aprobar, citas por confirmar, avisos por WhatsApp, citas en dos vistas ("Día", con navegación, y "Próximas", todas las futuras agrupadas por día), copiar enlace de reservas, tasa del día. Cada cita tiene a la derecha un botón de WhatsApp y "Liberar". En una cita confirmada el botón es "Recordatorio": abre WhatsApp con el texto de recordatorio de Ajustes y lo anota como enviado; si la clienta no aceptó recordatorios, o la cita no está confirmada, es un botón de chat sin mensaje. Las reservas que aún esperan el pago no aparecen: solo viven los minutos del reloj.
 - Recordatorios: citas de mañana y retoques pendientes.
 - Clientas: buscador, ficha con historial, casilla "Pide abono", nombre editable.
 - Servicios: secciones y servicios, orden por arrastre, visibilidad, formulario con foto.
