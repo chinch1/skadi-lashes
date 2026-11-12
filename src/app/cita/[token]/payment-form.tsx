@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { primaryButton, secondaryButton } from "@/components/ui";
+import { primaryButton } from "@/components/ui";
 import { formatBolivars, formatUsdt } from "@/lib/format";
 import { formatEuros } from "@/lib/money";
 import { formatPhone } from "@/lib/phone";
@@ -145,6 +145,23 @@ export function PaymentForm({
   const [method, setMethod] = useState<Method | null>(onlyOne);
   const [receipt, setReceipt] = useState<Blob | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
+
+  // Recibe el archivo elegido o soltado, lo reduce y prepara la vista previa.
+  async function pickReceipt(file: File | undefined) {
+    if (!file) return;
+    // Algunos iPhone no declaran el tipo de sus fotos: solo se rechaza lo que dice no ser imagen.
+    if (file.type && !file.type.startsWith("image/")) {
+      setReceiptError("El comprobante debe ser una imagen.");
+      return;
+    }
+    setReceiptError(null);
+    const small = await shrinkPhoto(file);
+    if (preview) URL.revokeObjectURL(preview);
+    setReceipt(small);
+    setPreview(URL.createObjectURL(small));
+  }
 
   const [state, action, pending] = useActionState(
     async (_prev: FormState, formData: FormData): Promise<FormState> => {
@@ -251,35 +268,70 @@ export function PaymentForm({
         </section>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         <span className="font-medium">Comprobante de pago</span>
-        {preview && (
-          <img
-            src={preview}
-            alt="Vista previa del comprobante"
-            className="max-h-72 w-full rounded-xl border border-border bg-white object-contain"
-          />
-        )}
+        {/* Zona para tocar o soltar la imagen: distinta de los botones de la pantalla. */}
         <label
-          className={`${secondaryButton} ${timeUp ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
+          onDragOver={(e) => {
+            if (timeUp) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            if (!timeUp) void pickReceipt(e.dataTransfer.files?.[0]);
+          }}
+          className={`flex min-h-36 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-4 text-center transition-colors ${
+            dragging ? "border-primary bg-tint" : "border-border-strong bg-white"
+          } ${timeUp ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
         >
-          {preview ? "Cambiar comprobante" : "Subir comprobante"}
+          {preview ? (
+            <>
+              <img
+                src={preview}
+                alt="Vista previa del comprobante"
+                className="max-h-64 w-full rounded-xl object-contain"
+              />
+              <span className="text-sm font-medium text-primary">
+                Toca para cambiarlo
+              </span>
+            </>
+          ) : (
+            <>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-8 text-primary"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 16V5M7.5 9.5 12 5l4.5 4.5M5 19h14" />
+              </svg>
+              <span className="font-medium">Toca para subir tu comprobante</span>
+              <span className="text-sm text-muted">
+                Una captura o foto del pago. También puedes arrastrarla aquí.
+              </span>
+            </>
+          )}
           <input
             type="file"
             name="receipt_file"
             accept="image/*"
             disabled={timeUp}
             className="sr-only"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const small = await shrinkPhoto(file);
-              if (preview) URL.revokeObjectURL(preview);
-              setReceipt(small);
-              setPreview(URL.createObjectURL(small));
-            }}
+            onChange={(e) => void pickReceipt(e.target.files?.[0])}
           />
         </label>
+        {receiptError && (
+          <p role="alert" className="text-sm text-red-800">
+            {receiptError}
+          </p>
+        )}
       </div>
 
       {timeUp && !pending && (
