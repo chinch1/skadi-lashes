@@ -56,7 +56,7 @@ export default async function Page() {
           No se pudieron cargar los mensajes. Recarga la página.
         </p>
       ) : (
-        <div className="mt-6 flex flex-col gap-6">
+        <div className="mt-6 flex flex-col gap-3">
           <MessageForm
             kind="confirmation"
             title="Al aprobar un abono"

@@ -79,13 +79,31 @@ export function MessageForm({
   const fieldId = `mensaje-${kind}`;
 
   return (
-    <form
-      action={action}
-      className="flex flex-col gap-3 rounded-2xl border border-border bg-white p-4"
+    // Acordeón: las cuatro secciones comparten `name`, así que al abrir una
+    // se cierra la que estaba abierta.
+    <details
+      name="mensajes"
+      className="group rounded-2xl border border-border bg-white"
     >
+      <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="text-lg font-semibold">{title}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="size-5 shrink-0 text-muted transition-transform group-open:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </summary>
+    <form action={action} className="flex flex-col gap-3 px-4 pb-4">
       <input type="hidden" name="kind" value={kind} />
       <div>
-        <label htmlFor={fieldId} className="text-lg font-semibold">
+        <label htmlFor={fieldId} className="sr-only">
           {title}
         </label>
         <p className="text-sm text-muted">{description}</p>
@@ -157,5 +175,6 @@ export function MessageForm({
         </p>
       )}
     </form>
+    </details>
   );
 }
