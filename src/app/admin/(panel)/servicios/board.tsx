@@ -170,19 +170,46 @@ function ServiceRow({ service }: { service: Service }) {
             </span>
           </span>
         </Link>
+        {/* Indicador y botón a la vez: muestra si las clientas lo ven y lo cambia al tocarlo. */}
+        <form
+          action={setServiceVisible.bind(null, service.id, !service.visible)}
+          className="shrink-0"
+        >
+          <button
+            aria-pressed={service.visible}
+            aria-label={
+              service.visible
+                ? `${service.name}: las clientas lo ven. Tocar para ocultarlo.`
+                : `${service.name}: oculto para las clientas. Tocar para mostrarlo.`
+            }
+            className={`flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-medium ${
+              service.visible
+                ? "border-primary/30 bg-tint text-primary"
+                : "border-border-strong bg-white text-muted"
+            }`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="size-5 sm:size-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+              {!service.visible && <path d="M4 4l16 16" />}
+            </svg>
+            {/* En teléfono queda solo el icono, para dejarle sitio al nombre. */}
+            <span className="hidden sm:inline">
+              {service.visible ? "Visible" : "Oculto"}
+            </span>
+          </button>
+        </form>
         <Handle label={service.name} handle={handle} />
       </div>
-      <form
-        action={setServiceVisible.bind(null, service.id, !service.visible)}
-        className="flex items-center justify-between gap-3 pl-[68px]"
-      >
-        <span className="text-sm text-muted">
-          {service.visible ? "Las clientas lo ven" : "Oculto para las clientas"}
-        </span>
-        <button className={smallButton}>
-          {service.visible ? "Ocultar" : "Mostrar"}
-        </button>
-      </form>
     </li>
   );
 }
