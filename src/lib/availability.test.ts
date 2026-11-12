@@ -87,14 +87,47 @@ describe("computeAvailability", () => {
     ]);
   });
 
-  it("antes de reservar, una hora ofrecida no bloquea a otra", () => {
-    const result = computeAvailability(
-      base({ slots: slots(DIA, "09:00", "11:00"), durationMin: 180 }),
-    );
-    expect(result[DIA]).toEqual(["09:00", "11:00"]);
+  it("no ofrece una hora si la cita se pasaría de la siguiente hora marcada", () => {
+    // Caso de Skadi: 9:00, 12:00 y 3:30 con servicios de 3 h 30 min.
+    // 9:00 terminaría a las 12:30, pasada la hora de las 12:00: no se ofrece.
+    // 12:00 termina justo a las 3:30; 3:30 es la última y no tiene límite.
+    const marcadas = slots(DIA, "09:00", "12:00", "15:30");
+    expect(computeAvailability(base({ slots: marcadas, durationMin: 210 }))[DIA]).toEqual([
+      "12:00",
+      "15:30",
+    ]);
+    // Con 3 horas, las tres caben.
+    expect(computeAvailability(base({ slots: marcadas, durationMin: 180 }))[DIA]).toEqual([
+      "09:00",
+      "12:00",
+      "15:30",
+    ]);
+    // Con 4 horas, solo la última.
+    expect(computeAvailability(base({ slots: marcadas, durationMin: 240 }))[DIA]).toEqual([
+      "15:30",
+    ]);
   });
 
-  it("una cita larga consume las horas siguientes que se cruzan", () => {
+  it("cuenta el descanso entre clientas al medir hasta la siguiente hora", () => {
+    const marcadas = slots(DIA, "09:00", "12:00");
+    expect(
+      computeAvailability(base({ slots: marcadas, durationMin: 180, bufferMin: 15 }))[DIA],
+    ).toEqual(["12:00"]);
+  });
+
+  it("la siguiente hora marcada limita aunque ya esté ocupada o haya pasado", () => {
+    // 12:00 está ocupada por una cita: 9:00 con 3 h 30 min sigue sin ofrecerse.
+    const result = computeAvailability(
+      base({
+        slots: slots(DIA, "09:00", "12:00"),
+        durationMin: 210,
+        appointments: [cita(DIA, "12:00", "13:00")],
+      }),
+    );
+    expect(result[DIA]).toEqual([]);
+  });
+
+  it("una cita ya guardada ocupa las horas marcadas que pisa", () => {
     const result = computeAvailability(
       base({
         slots: slots(DIA, "09:00", "11:00"),
