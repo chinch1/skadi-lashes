@@ -262,6 +262,21 @@ export async function createBooking(input: BookingInput): Promise<BookingResult>
     });
     if (!client) return { ok: false, code: "server", error: BOOKING_ERROR };
 
+    // Si esta clienta dejó a medias otra reserva (salió de la pantalla de pago
+    // o volvió atrás sin pagar), ese cupo se libera ya, sin esperar al reloj.
+    // Solo afecta a reservas que siguen esperando el pago: con comprobante
+    // enviado o sin abono, `hold_expires_at` es nulo y no se tocan.
+    const { error: abandonedError } = await supabase
+      .from("appointments")
+      .update({ status: "released", hold_expires_at: null })
+      .eq("studio_id", studioId)
+      .eq("client_id", client.id)
+      .eq("status", "pending_deposit")
+      .not("hold_expires_at", "is", null);
+    if (abandonedError) {
+      return bookingFailure("liberar reserva abandonada", abandonedError.message);
+    }
+
     const studioDeposit = Number(studio.deposit_cents) || 0;
     const skipsDeposit = client.depositExempt || studioDeposit <= 0;
     const holdMinutes = Number(studio.pending_hold_minutes) || DEFAULT_HOLD_MINUTES;
