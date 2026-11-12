@@ -15,7 +15,7 @@ Contexto del proyecto tal como quedó construido. Describe lo que existe hoy, no
 ## Estado
 
 - Los doce pasos del plan están hechos y publicados (12 nov 2026).
-- **La base de datos ya tiene datos reales**: los servicios de Giselle, clientas y citas. No crear, cambiar ni borrar datos de prueba sin avisar a Nico. Quedan dos servicios `PRUEBA · …` ocultos.
+- **La base de datos ya tiene datos reales**: los servicios de Giselle, clientas y citas. No crear, cambiar ni borrar datos de prueba sin avisar a Nico.
 - Lo que falta está en "Pendiente" al final.
 
 ## Tecnología
@@ -232,5 +232,4 @@ Por comprobar:
 
 Limpieza:
 
-- Borrar los dos servicios `PRUEBA · …`.
 - Decidir si `.mcp.json` se sube o se ignora.
