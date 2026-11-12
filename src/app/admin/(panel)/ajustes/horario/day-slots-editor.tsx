@@ -362,7 +362,8 @@ export function DaySlotsEditor({
           )}
 
           <p className="mt-3 text-sm text-muted">
-            Si una cita larga ocupa la hora siguiente, esa hora deja de ofrecerse sola.
+            Cada hora se ofrece solo si la cita termina antes de la siguiente hora
+            que marcaste. La última hora del día no tiene límite.
           </p>
 
           {/* Encima de la barra de pestañas (56 px más el borde y el área segura). */}

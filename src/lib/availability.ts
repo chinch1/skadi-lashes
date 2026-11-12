@@ -65,7 +65,8 @@ function groupSlots(slots: DaySlot[]): Map<string, Set<number>> {
 
 // Devuelve cada fecha de `from` a `to` como clave, con su lista ordenada de
 // horas locales de inicio "HH:MM" (lista vacía = día sin cupo).
-// Solo las citas reales ocupan horario: una hora ofrecida no bloquea a otra.
+// Una hora se ofrece solo si la cita completa termina antes de la siguiente
+// hora marcada de ese día (la última del día no tiene límite) y no pisa otra cita.
 export function computeAvailability(input: AvailabilityInput): Record<string, string[]> {
   const { timeZone, durationMin, bufferMin, minNoticeMin, now, from, to, lastBookableDate } =
     input;
@@ -78,6 +79,7 @@ export function computeAvailability(input: AvailabilityInput): Record<string, st
   const appointments = toIntervals(input.appointments, Math.max(0, bufferMin) * MINUTE_MS);
   const earliest = now.getTime() + minNoticeMin * MINUTE_MS;
   const durationMs = durationMin * MINUTE_MS;
+  const rest = Math.max(0, bufferMin);
 
   // Las fechas "AAAA-MM-DD" se comparan bien como texto.
   for (let date = from, count = 0; date <= to && count < MAX_DAYS; date = addDays(date, 1), count++) {
@@ -87,9 +89,14 @@ export function computeAvailability(input: AvailabilityInput): Record<string, st
       continue;
     }
 
-    result[date] = [...candidates]
-      .sort((a, b) => a - b)
-      .filter((minute) => {
+    const sorted = [...candidates].sort((a, b) => a - b);
+    result[date] = sorted
+      .filter((minute, index) => {
+        // La cita no puede pasarse de la siguiente hora que Skadi marcó: esa
+        // hora es otro cupo. Se cuenta también el descanso entre clientas.
+        const next = sorted[index + 1];
+        if (next !== undefined && minute + durationMin + rest > next) return false;
+
         const start = zonedToUtc(date, minutesToTime(minute), timeZone).getTime();
         if (start < earliest) return false;
         return !overlaps(start, start + durationMs, appointments);
