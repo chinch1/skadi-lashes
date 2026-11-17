@@ -10,6 +10,7 @@ import { buildRules, type Rule } from "@/lib/rules";
 import { formatDuration } from "@/lib/services";
 import { getRuleSettings } from "@/lib/studio-settings";
 import { ChangeSlotButton } from "./change-slot-button";
+import { LeavePaymentLink } from "./leave-payment-link";
 import { PaymentClock } from "./countdown";
 import { PaymentForm } from "./payment-form";
 
@@ -266,12 +267,17 @@ export default async function Page(props: PageProps<"/cita/[token]">) {
       {header}
       <Summary view={view} />
       {body}
-      <Link
-        href="/"
-        className="flex min-h-11 items-center justify-center text-muted underline"
-      >
-        Volver al inicio
-      </Link>
+      {view.state === "awaiting_payment" && view.canChangeSlot ? (
+        // Con el cupo apartado y sin pagar, volver al inicio lo libera.
+        <LeavePaymentLink token={view.token} />
+      ) : (
+        <Link
+          href="/"
+          className="flex min-h-11 items-center justify-center text-muted underline"
+        >
+          Volver al inicio
+        </Link>
+      )}
     </main>
   );
 }
